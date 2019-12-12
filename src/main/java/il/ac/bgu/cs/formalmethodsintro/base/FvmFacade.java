@@ -1,6 +1,7 @@
 package il.ac.bgu.cs.formalmethodsintro.base;
 
 import java.io.InputStream;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -15,6 +16,7 @@ import il.ac.bgu.cs.formalmethodsintro.base.programgraph.ActionDef;
 import il.ac.bgu.cs.formalmethodsintro.base.programgraph.ConditionDef;
 import il.ac.bgu.cs.formalmethodsintro.base.programgraph.ProgramGraph;
 import il.ac.bgu.cs.formalmethodsintro.base.transitionsystem.AlternatingSequence;
+import il.ac.bgu.cs.formalmethodsintro.base.transitionsystem.TSTransition;
 import il.ac.bgu.cs.formalmethodsintro.base.transitionsystem.TransitionSystem;
 import il.ac.bgu.cs.formalmethodsintro.base.util.Pair;
 import il.ac.bgu.cs.formalmethodsintro.base.verification.VerificationResult;
@@ -156,7 +158,13 @@ public class FvmFacade {
      * @throws StateNotFoundException if {@code s} is not a state of {@code ts}.
      */
     public <S> Set<S> post(TransitionSystem<S, ?, ?> ts, S s) {
-        throw new java.lang.UnsupportedOperationException();
+        Set<S> retSet = new HashSet<>();
+        Set<? extends TSTransition<S, ?>> transitions = ts.getTransitions();
+        // Added every state that is reachable from s with transition 'trans'
+        for (TSTransition<S, ?> trans:transitions)
+            if(trans.getFrom().equals(s))
+                retSet.add(trans.getTo());
+        return retSet;
     }
 
     /**
@@ -168,7 +176,13 @@ public class FvmFacade {
      * @throws StateNotFoundException if {@code s} is not a state of {@code ts}.
      */
     public <S> Set<S> post(TransitionSystem<S, ?, ?> ts, Set<S> c) {
-        throw new java.lang.UnsupportedOperationException();
+        Set<S> retSet = new HashSet<>();
+        // Got the post states for each state in c and added them in a set
+        for(S s : c){
+            Set<S> gotSet = post(ts, s);
+            retSet.addAll(gotSet);
+        }
+        return retSet;
     }
 
     /**
@@ -182,7 +196,13 @@ public class FvmFacade {
      * @throws StateNotFoundException if {@code s} is not a state of {@code ts}.
      */
     public <S, A> Set<S> post(TransitionSystem<S, A, ?> ts, S s, A a) {
-        throw new java.lang.UnsupportedOperationException();
+        Set<S> retSet = new HashSet<>();
+        Set<? extends TSTransition<S, ?>> transitions = ts.getTransitions();
+        // Added every state that is reachable from s with action a in transition 'trans'
+        for (TSTransition<S, ?> trans:transitions)
+            if(trans.getFrom().equals(s) && trans.getAction().equals(a))
+                retSet.add(trans.getTo());
+        return retSet;
     }
 
     /**
@@ -195,7 +215,13 @@ public class FvmFacade {
      * in {@code c}, when action {@code a} is selected.
      */
     public <S, A> Set<S> post(TransitionSystem<S, A, ?> ts, Set<S> c, A a) {
-        throw new java.lang.UnsupportedOperationException();
+        Set<S> retSet = new HashSet<>();
+        // Got the post states for each state in c and added them in a set
+        for(S s : c){
+            Set<S> gotSet = post(ts, s, a);
+            retSet.addAll(gotSet);
+        }
+        return retSet;
     }
 
     /**
@@ -257,6 +283,7 @@ public class FvmFacade {
      * @return All states reachable in {@code ts}.
      */
     public <S, A> Set<S> reach(TransitionSystem<S, A, ?> ts) {
+        // Start with initials, get their posts and so on until dead-end.
         throw new java.lang.UnsupportedOperationException();
     }
 
