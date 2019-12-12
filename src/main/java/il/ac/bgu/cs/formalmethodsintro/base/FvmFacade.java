@@ -160,7 +160,7 @@ public class FvmFacade {
     public <S> Set<S> post(TransitionSystem<S, ?, ?> ts, S s) {
         Set<S> retSet = new HashSet<>();
         Set<? extends TSTransition<S, ?>> transitions = ts.getTransitions();
-        // Added every state that is reachable from s with transition 'trans'
+        // Added every state that is reachable from s using transition 'trans'
         for (TSTransition<S, ?> trans:transitions)
             if(trans.getFrom().equals(s))
                 retSet.add(trans.getTo());
@@ -198,7 +198,7 @@ public class FvmFacade {
     public <S, A> Set<S> post(TransitionSystem<S, A, ?> ts, S s, A a) {
         Set<S> retSet = new HashSet<>();
         Set<? extends TSTransition<S, ?>> transitions = ts.getTransitions();
-        // Added every state that is reachable from s with action a in transition 'trans'
+        // Added every state that is reachable from s using action a in transition 'trans'
         for (TSTransition<S, ?> trans:transitions)
             if(trans.getFrom().equals(s) && trans.getAction().equals(a))
                 retSet.add(trans.getTo());
@@ -216,7 +216,7 @@ public class FvmFacade {
      */
     public <S, A> Set<S> post(TransitionSystem<S, A, ?> ts, Set<S> c, A a) {
         Set<S> retSet = new HashSet<>();
-        // Got the post states for each state in c and added them in a set
+        // Got the post states for each state in c  using action a and added them in a set
         for(S s : c){
             Set<S> gotSet = post(ts, s, a);
             retSet.addAll(gotSet);
@@ -231,7 +231,13 @@ public class FvmFacade {
      * @return All the states in {@code Pre(s)}, in the context of {@code ts}.
      */
     public <S> Set<S> pre(TransitionSystem<S, ?, ?> ts, S s) {
-        throw new java.lang.UnsupportedOperationException();
+        Set<S> retSet = new HashSet<>();
+        Set<? extends TSTransition<S, ?>> transitions = ts.getTransitions();
+        // Added every state that s is reachable from using transition 'trans'
+        for (TSTransition<S, ?> trans:transitions)
+            if(trans.getTo().equals(s))
+                retSet.add(trans.getFrom());
+        return retSet;
     }
 
     /**
@@ -243,7 +249,13 @@ public class FvmFacade {
      * @throws StateNotFoundException if {@code s} is not a state of {@code ts}.
      */
     public <S> Set<S> pre(TransitionSystem<S, ?, ?> ts, Set<S> c) {
-        throw new java.lang.UnsupportedOperationException();
+        Set<S> retSet = new HashSet<>();
+        // Got the pre states for each state in c and added them in a set
+        for(S s : c){
+            Set<S> gotSet = pre(ts, s);
+            retSet.addAll(gotSet);
+        }
+        return retSet;
     }
 
     /**
@@ -257,7 +269,13 @@ public class FvmFacade {
      * @throws StateNotFoundException if {@code s} is not a state of {@code ts}.
      */
     public <S, A> Set<S> pre(TransitionSystem<S, A, ?> ts, S s, A a) {
-        throw new java.lang.UnsupportedOperationException();
+        Set<S> retSet = new HashSet<>();
+        Set<? extends TSTransition<S, ?>> transitions = ts.getTransitions();
+        // Added every state that s is reachable from using action a and transition 'trans'
+        for (TSTransition<S, ?> trans:transitions)
+            if(trans.getTo().equals(s) && trans.getAction().equals(a))
+                retSet.add(trans.getFrom());
+        return retSet;
     }
 
     /**
@@ -271,8 +289,15 @@ public class FvmFacade {
      * @throws StateNotFoundException if {@code s} is not a state of {@code ts}.
      */
     public <S, A> Set<S> pre(TransitionSystem<S, A, ?> ts, Set<S> c, A a) {
-        throw new java.lang.UnsupportedOperationException();
+        Set<S> retSet = new HashSet<>();
+        // Got the pre states for each state in c using action a and added them in a set
+        for(S s : c){
+            Set<S> gotSet = pre(ts, s, a);
+            retSet.addAll(gotSet);
+        }
+        return retSet;
     }
+
 
     /**
      * Implements the {@code reach(TS)} function.
@@ -284,7 +309,18 @@ public class FvmFacade {
      */
     public <S, A> Set<S> reach(TransitionSystem<S, A, ?> ts) {
         // Start with initials, get their posts and so on until dead-end.
-        throw new java.lang.UnsupportedOperationException();
+        Set<S> retSet = new HashSet<>();
+        Set<S> curr = ts.getInitialStates();
+        while(!curr.isEmpty()){
+            Set<S> statsToContinue = new HashSet<>();
+            for (S s : curr)
+                if (!retSet.contains(s)){
+                    retSet.add(s);
+                    statsToContinue.add(s);
+                }
+            curr = post(ts, statsToContinue);
+        }
+        return retSet;
     }
 
     /**
