@@ -376,7 +376,6 @@ public class FvmFacade {
                         ret_set.add(new TSTransition<>(state1, transition2.getAction(),
                                 new Pair<>(state1.first, transition2.getTo())));
         return ret_set;
-
     }
 
     private <S1, S2, P, A> Set<Pair<S1,S2>> getStatesInterleave(TransitionSystem<S1, A, P> ts1, TransitionSystem<S2, A, P> ts2) {
@@ -434,7 +433,7 @@ public class FvmFacade {
      */
     public <S1, S2, A, P> TransitionSystem<Pair<S1, S2>, A, P> interleave(TransitionSystem<S1, A, P> ts1,
             TransitionSystem<S2, A, P> ts2, Set<A> handShakingActions) {
-        
+
         //States
         Set<Pair<S1, S2>> new_states = getStatesInterleave(ts1, ts2);
 
@@ -466,8 +465,6 @@ public class FvmFacade {
                                                             , new_transitions, new_APs, L_function);
 
         return ret_ST;
-
-
     }
 
     /**
@@ -501,8 +498,8 @@ public class FvmFacade {
      * @param c The circuit to translate into a {@link TransitionSystem}.
      * @return A {@link TransitionSystem} representing {@code c}.
      */
-    public TransitionSystem<Pair<Map<String, Boolean>, Map<String, Boolean>>, Map<String, Boolean>, Object> transitionSystemFromCircuit(
-            Circuit c) {
+    public TransitionSystem<Pair<Map<String, Boolean>, Map<String, Boolean>>, Map<String, Boolean>, Object>
+        transitionSystemFromCircuit(Circuit c) {
         throw new java.lang.UnsupportedOperationException();
     }
 
@@ -567,6 +564,8 @@ public class FvmFacade {
     public ProgramGraph<String, String> programGraphFromNanoPromela(InputStream inputStream) throws Exception {
         throw new java.lang.UnsupportedOperationException();
     }
+
+    // UTNTUIL HERERERE
 
     /**
      * Creates a transition system from a transition system and an automaton.
