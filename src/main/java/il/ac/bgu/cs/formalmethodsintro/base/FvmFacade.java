@@ -11,6 +11,7 @@ import il.ac.bgu.cs.formalmethodsintro.base.exceptions.StateNotFoundException;
 import il.ac.bgu.cs.formalmethodsintro.base.ltl.LTL;
 import il.ac.bgu.cs.formalmethodsintro.base.programgraph.ActionDef;
 import il.ac.bgu.cs.formalmethodsintro.base.programgraph.ConditionDef;
+import il.ac.bgu.cs.formalmethodsintro.base.programgraph.PGTransition;
 import il.ac.bgu.cs.formalmethodsintro.base.programgraph.ProgramGraph;
 import il.ac.bgu.cs.formalmethodsintro.base.transitionsystem.AlternatingSequence;
 import il.ac.bgu.cs.formalmethodsintro.base.transitionsystem.TSTransition;
@@ -22,7 +23,10 @@ import il.ac.bgu.cs.formalmethodsintro.base.verification.VerificationResult;
  * Interface for the entry point class to the HW in this class. Our
  * client/testing code interfaces with the student solutions through this
  * interface only. <br>
+<<<<<<< HEAD
  * More about facade: {@linkplain //www.vincehuston.org/dp/facade.html}.
+=======
+>>>>>>> master
  */
 public class FvmFacade {
 
@@ -51,7 +55,17 @@ public class FvmFacade {
      * @return {@code true} iff the action is deterministic.
      */
     public <S, A, P> boolean isActionDeterministic(TransitionSystem<S, A, P> ts) {
-        throw new java.lang.UnsupportedOperationException();
+        if(ts.getInitialStates().size()>1) return false; //|I|<=1
+        else{
+            Set<Pair<S,A>> pair_set= new HashSet<>();
+            Set<TSTransition<S, A>> ts_transition= ts.getTransitions();
+            for (TSTransition<S, A> t : ts_transition){
+                Pair<S,A> p1=new Pair<>(t.getFrom(),t.getAction());
+                if(pair_set.contains(p1)) return false; //means we saw before a
+                pair_set.add(p1);
+            }
+            return true;
+        }
     }
 
     /**
@@ -65,7 +79,18 @@ public class FvmFacade {
      * @return {@code true} iff the action is ap-deterministic.
      */
     public <S, A, P> boolean isAPDeterministic(TransitionSystem<S, A, P> ts) {
-        throw new java.lang.UnsupportedOperationException();
+        if(ts.getInitialStates().size()>1) return false; //|I|<=1
+        else{
+            Set<Pair<Pair<S,A>,Set<P>>> pair_set= new HashSet<>();
+            Set<TSTransition<S, A>> ts_transition= ts.getTransitions();
+            for (TSTransition<S, A> t : ts_transition){
+                Pair<S,A> p1=new Pair<>(t.getFrom(),t.getAction());
+                Pair<Pair<S,A>,Set<P>> p2=new Pair<>(p1,ts.getLabel(t.getTo()));
+                if(pair_set.contains(p2)) return false;
+                pair_set.add(p2);
+            }
+            return true;
+        }
     }
 
     /**
@@ -489,7 +514,32 @@ public class FvmFacade {
      * @return Interleaved program graph.
      */
     public <L1, L2, A> ProgramGraph<Pair<L1, L2>, A> interleave(ProgramGraph<L1, A> pg1, ProgramGraph<L2, A> pg2) {
-        throw new java.lang.UnsupportedOperationException();
+        ProgramGraph<Pair<L1,L2>,A> ret_graph=createProgramGraph();
+        Set<List<String>> in_ret=new HashSet<>();
+        in_ret.addAll(pg1.getInitalizations());
+        in_ret.addAll(pg2.getInitalizations());
+        for (PGTransition<L1,A> pga: pg1.getTransitions())
+            for (L2 loc2:pg2.getLocations()){
+                Pair<L1,L2> to=new Pair<>(pga.getTo(),loc2);
+                Pair<L1,L2> from=new Pair<>(pga.getFrom(),loc2);
+                A action=pga.getAction();
+                String cond=pga.getCondition();
+                PGTransition pgt_n=new PGTransition(from,cond,action,to);
+                ret_graph.addTransition(pgt_n);
+            }
+        for (PGTransition<L2,A> pgb: pg2.getTransitions())
+            for (L1 loc1:pg1.getLocations()){
+                Pair<L1,L2> from=new Pair<>(loc1,pgb.getFrom());
+                Pair<L1,L2> to=new Pair<>(loc1,pgb.getTo());
+                A action=pgb.getAction();
+                String cond=pgb.getCondition();
+                PGTransition pgt_e=new PGTransition(from,cond,action,to);
+                ret_graph.addTransition(pgt_e);
+            }
+        for (Pair<L1,L2> loc: ret_graph.getLocations())
+            if(pg1.getInitialLocations().contains(loc.first)&&pg2.getInitialLocations().contains(loc.second))
+                ret_graph.setInitial(loc,true);
+        return ret_graph;
     }
 
     /**
