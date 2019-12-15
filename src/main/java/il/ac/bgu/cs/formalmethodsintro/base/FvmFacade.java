@@ -1,10 +1,7 @@
 package il.ac.bgu.cs.formalmethodsintro.base;
 
 import java.io.InputStream;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import il.ac.bgu.cs.formalmethodsintro.base.automata.Automaton;
 import il.ac.bgu.cs.formalmethodsintro.base.automata.MultiColorAutomaton;
@@ -25,7 +22,7 @@ import il.ac.bgu.cs.formalmethodsintro.base.verification.VerificationResult;
  * Interface for the entry point class to the HW in this class. Our
  * client/testing code interfaces with the student solutions through this
  * interface only. <br>
- * More about facade: {@linkplain http://www.vincehuston.org/dp/facade.html}.
+ * More about facade: {@linkplain //www.vincehuston.org/dp/facade.html}.
  */
 public class FvmFacade {
 
@@ -83,7 +80,7 @@ public class FvmFacade {
      * @return {@code true} iff {@code e} is an execution of {@code ts}.
      */
     public <S, A, P> boolean isExecution(TransitionSystem<S, A, P> ts, AlternatingSequence<S, A> e) {
-        throw new java.lang.UnsupportedOperationException();
+        return isExecutionFragment(ts, e) && ts.getInitialStates().contains(e.head()) && isStateTerminal(ts, e.last());
     }
 
     /**
@@ -100,7 +97,17 @@ public class FvmFacade {
      * {@code ts}.
      */
     public <S, A, P> boolean isExecutionFragment(TransitionSystem<S, A, P> ts, AlternatingSequence<S, A> e) {
-        throw new java.lang.UnsupportedOperationException();
+        AlternatingSequence<S, A> curr = e;
+        for (int i = 0; i < e.size(); i = i + 2) {
+            S s1 = curr.head();
+            A a = curr.tail().head();
+            curr = curr.tail().tail();
+            S s2 = curr.head();
+            // Checks if <s1,a,s2> is a valid transition.
+            if (!(post(ts, s1, a).contains(s2)))
+                return false;
+        }
+        return true;
     }
 
     /**
@@ -117,7 +124,7 @@ public class FvmFacade {
      * {@code ts}.
      */
     public <S, A, P> boolean isInitialExecutionFragment(TransitionSystem<S, A, P> ts, AlternatingSequence<S, A> e) {
-        throw new java.lang.UnsupportedOperationException();
+        return isExecution(ts, e) && ts.getInitialStates().contains(e.head());
     }
 
     /**
@@ -133,7 +140,7 @@ public class FvmFacade {
      * @return {@code true} iff {@code e} is a maximal fragment of {@code ts}.
      */
     public <S, A, P> boolean isMaximalExecutionFragment(TransitionSystem<S, A, P> ts, AlternatingSequence<S, A> e) {
-        throw new java.lang.UnsupportedOperationException();
+        return isExecutionFragment(ts, e) && isStateTerminal(ts, e.last());
     }
 
     /**
@@ -147,7 +154,10 @@ public class FvmFacade {
      * @throws StateNotFoundException if {@code s} is not a state of {@code ts}.
      */
     public <S, A> boolean isStateTerminal(TransitionSystem<S, A, ?> ts, S s) {
-        throw new java.lang.UnsupportedOperationException();
+        for (TSTransition<S, A> transition : ts.getTransitions())
+            if (transition.getFrom().equals(s))
+                return false;
+        return true;
     }
 
     /**
@@ -337,7 +347,76 @@ public class FvmFacade {
      */
     public <S1, S2, A, P> TransitionSystem<Pair<S1, S2>, A, P> interleave(TransitionSystem<S1, A, P> ts1,
             TransitionSystem<S2, A, P> ts2) {
-        throw new java.lang.UnsupportedOperationException();
+        return interleave(ts1, ts2, new HashSet<>());
+    }
+
+    private <S1, S2, A, P> Set<TSTransition<Pair<S1,S2>,A>> getTransInterleave(TransitionSystem<S1, A, P> ts1,
+                                                                               TransitionSystem<S2, A, P> ts2,
+                                                                               Set<Pair<S1, S2>> new_states, Set<A> handShakingActions) {
+        Set<TSTransition<Pair<S1,S2>,A>> ret_set = new HashSet<>();
+        for (TSTransition<S1, A> transition1 : ts1.getTransitions()){
+            if (!(handShakingActions.contains(transition1.getAction())))
+                for (Pair<S1, S2> state1 : new_states)
+                    if (state1.first.equals(transition1.getFrom()))
+                        ret_set.add(new TSTransition<>(state1, transition1.getAction(),
+                                new Pair<>(transition1.getTo(),state1.second)));
+            else
+                for (Pair<S1, S2> state2 : new_states)
+                    if (state2.first.equals(transition1.getFrom()))
+                        for (TSTransition<S2, A> transition2 : ts2.getTransitions())
+                            if (transition2.getFrom().equals(state2.second) &&
+                                    transition2.getAction().equals(transition1.getAction()))
+                                ret_set.add(new TSTransition<>(state1, transition1.getAction(),
+                                        new Pair<>(transition1.getTo(),transition2.getTo())));
+        }
+        for (TSTransition<S2, A> transition2 : ts2.getTransitions())
+            if (!(handShakingActions.contains(transition2.getAction())))
+                for (Pair<S1, S2> state1 : new_states)
+                    if (state1.second.equals(transition2.getFrom()))
+                        ret_set.add(new TSTransition<>(state1, transition2.getAction(),
+                                new Pair<>(state1.first, transition2.getTo())));
+        return ret_set;
+
+    }
+
+    private <S1, S2, P, A> Set<Pair<S1,S2>> getStatesInterleave(TransitionSystem<S1, A, P> ts1, TransitionSystem<S2, A, P> ts2) {
+        Set<Pair<S1, S2>> ret_set = new HashSet<>();
+        for (S1 s1 : ts1.getStates())
+            for (S2 s2 : ts2.getStates())
+                ret_set.add(new Pair<>(s1, s2));
+        return ret_set;
+    }
+
+    private <A, S2, P, S1> TransitionSystem<Pair<S1,S2>,A,P> createTS(Set<Pair<S1, S2>> new_states, Set<Pair<S1, S2>> initials, Set<A> new_actions,
+                                                                      Set<TSTransition<Pair<S1, S2>, A>> new_transitions, Set<P> new_APs,
+                                                                      Map<Pair<S1, S2>, Set<P>> L_function) {
+        TransitionSystem<Pair<S1, S2>, A, P> ret_ST = new TransitionSystem<>();
+        for (Pair<S1, S2> state : new_states){
+            if (initials.contains(state))
+                ret_ST.addInitialState(state);
+            else
+                ret_ST.addState(state);
+        }
+        ret_ST.addAllActions(new_actions);
+        for (TSTransition<Pair<S1,S2>,A> transition : new_transitions)
+            ret_ST.addTransition(transition);
+        ret_ST.addAllAtomicPropositions(new_APs);
+        for (Pair<S1, S2> state : L_function.keySet())
+            ret_ST.addToLabel(state, (P) L_function.get(state));
+
+        return ret_ST;
+    }
+
+    private <S2, S1, A, P> Map<Pair<S1,S2>,Set<P>> getLFunction(
+            TransitionSystem<S1, A, P> ts1, TransitionSystem<S2, A, P> ts2, Set<Pair<S1, S2>> new_states) {
+        Map<Pair<S1, S2>, Set<P>> L_function = new HashMap<>();
+        for (Pair<S1, S2> state : new_states){
+            Set<P> curr_AP = new HashSet<>();
+            curr_AP.addAll(ts1.getLabel(state.first));
+            curr_AP.addAll(ts2.getLabel(state.second));
+            L_function.put(state, curr_AP);
+        }
+        return L_function;
     }
 
     /**
@@ -355,7 +434,40 @@ public class FvmFacade {
      */
     public <S1, S2, A, P> TransitionSystem<Pair<S1, S2>, A, P> interleave(TransitionSystem<S1, A, P> ts1,
             TransitionSystem<S2, A, P> ts2, Set<A> handShakingActions) {
-        throw new java.lang.UnsupportedOperationException();
+        
+        //States
+        Set<Pair<S1, S2>> new_states = getStatesInterleave(ts1, ts2);
+
+        // Initials
+        Set<Pair<S1, S2>> initials = new HashSet<>();
+        for (Pair<S1, S2> pair : new_states)
+            if (ts1.getInitialStates().contains(pair.first) && ts2.getInitialStates().contains(pair.second))
+                initials.add(pair);
+
+        // Transitions
+        Set<TSTransition<Pair<S1,S2>,A>> new_transitions =
+                getTransInterleave(ts1, ts2, new_states, handShakingActions);
+
+        // Actions
+        Set<A> new_actions = new HashSet<>();
+        new_actions.addAll(ts1.getActions());
+        new_actions.addAll(ts2.getActions());
+
+        // APs
+        Set<P> new_APs = new HashSet<>();
+        new_APs.addAll(ts1.getAtomicPropositions());
+        new_APs.addAll(ts2.getAtomicPropositions());
+
+        // L function
+        Map<Pair<S1, S2>, Set<P>> L_function = getLFunction(ts1, ts2, new_states);
+
+        // Create Transition System
+        TransitionSystem<Pair<S1, S2>, A, P> ret_ST = createTS(new_states, initials, new_actions
+                                                            , new_transitions, new_APs, L_function);
+
+        return ret_ST;
+
+
     }
 
     /**
