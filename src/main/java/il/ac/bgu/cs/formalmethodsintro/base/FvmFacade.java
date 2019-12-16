@@ -515,9 +515,13 @@ public class FvmFacade {
      */
     public <L1, L2, A> ProgramGraph<Pair<L1, L2>, A> interleave(ProgramGraph<L1, A> pg1, ProgramGraph<L2, A> pg2) {
         ProgramGraph<Pair<L1,L2>,A> ret_graph=createProgramGraph();
-        Set<List<String>> in_ret=new HashSet<>();
-        in_ret.addAll(pg1.getInitalizations());
-        in_ret.addAll(pg2.getInitalizations());
+        for(List<String> l1:pg1.getInitalizations()){
+            for(List<String> l2:pg2.getInitalizations()){
+                List<String> l=new LinkedList<>();
+                l.addAll(l1);l.addAll(l2);
+                ret_graph.addInitalization(l);
+            }
+        }
         for (PGTransition<L1,A> pga: pg1.getTransitions())
             for (L2 loc2:pg2.getLocations()){
                 Pair<L1,L2> to=new Pair<>(pga.getTo(),loc2);
@@ -542,6 +546,26 @@ public class FvmFacade {
         return ret_graph;
     }
 
+
+    private List<Map<String,Boolean>> get_all_combos( int index_in_list, Map<String,Boolean> ret_map,List<String> list){
+        Map<String,Boolean>[] arr_ofmaps=new Map[2];
+        List<Map<String,Boolean>> ret=new LinkedList<>();
+        arr_ofmaps[0]=new HashMap<>(ret_map);
+        arr_ofmaps[1]=new HashMap<>(ret_map);
+        arr_ofmaps[0].put(list.get(index_in_list),false);
+        arr_ofmaps[1].put(list.get(index_in_list),true);
+        ret.addAll(get_all_combos(index_in_list+1,arr_ofmaps[0],list));
+        ret.addAll(get_all_combos(index_in_list+1,arr_ofmaps[1],list));
+        return ret;
+    }
+    private List<String> get_true(Map<String,Boolean> map){
+        List<String> ret= new LinkedList<>();
+        for (String s: map.keySet()){
+            if(map.get(s)) ret.add(s);
+        }
+        return ret;
+    }
+
     /**
      * Creates a {@link TransitionSystem} representing the passed circuit.
      *
@@ -550,7 +574,42 @@ public class FvmFacade {
      */
     public TransitionSystem<Pair<Map<String, Boolean>, Map<String, Boolean>>, Map<String, Boolean>, Object>
         transitionSystemFromCircuit(Circuit c) {
-        throw new java.lang.UnsupportedOperationException();
+        List<String> tags=new LinkedList<>(); //all tags
+        tags.addAll(c.getRegisterNames());
+        tags.addAll(c.getInputPortNames());
+        tags.addAll(c.getOutputPortNames());
+        //collected all tags
+       TransitionSystem<Pair<Map<String, Boolean>, Map<String, Boolean>>, Map<String, Boolean>, Object> ret_ts=new TransitionSystem<>();
+       for (String s: tags) ret_ts.addAtomicProposition(s); //added all tags
+       List<Map<String,Boolean>> list_regs_combo=get_all_combos(0,new HashMap<String, Boolean>(),new LinkedList<String>(c.getRegisterNames()));
+        List<Map<String,Boolean>> list_input_combos=get_all_combos(0,new HashMap<String, Boolean>(),new LinkedList<String>(c.getInputPortNames()));
+        //created all possible combo's for states
+        for (Map<String, Boolean> reg: list_regs_combo ){
+            for (Map<String,Boolean> a:list_input_combos){
+                Pair<Map<String, Boolean>, Map<String, Boolean>> p=new Pair<>(reg,a); //matched combo's
+                ret_ts.addState(p); //added
+                boolean isinitial=true;
+                for (String r:reg.keySet()) if (reg.get(r)) isinitial=false; //all regs start with false
+                if (isinitial) ret_ts.addInitialState(p); //if all is false- set as initial state
+            }
+        }
+        for (Pair<Map<String, Boolean>, Map<String, Boolean>> state: ret_ts.getStates()){
+            for (Map<String,Boolean> a:list_input_combos){
+                //going over all the states with every possible input
+                Map<String,Boolean> ret_c=c.updateRegisters(a,state.first); //getting new regs
+                Map<String,Boolean> out_c=c.computeOutputs(a,ret_c); //getting new output
+                TSTransition<Pair<Map<String, Boolean>, Map<String, Boolean>>,Map<String, Boolean>> tsTransition; //declare
+                Pair<Map<String, Boolean>, Map<String, Boolean>> post_state=new Pair<>(ret_c,a); //new state
+                tsTransition=new TSTransition<>(state,a,post_state); //creating
+                ret_ts.addTransition(tsTransition); //adding transion
+                List<String> state_pros=new LinkedList<>(); //for this state tags
+                state_pros.addAll(get_true(out_c));state_pros.addAll(get_true(ret_c));state_pros.addAll(get_true(a)); //finding tags
+                for (String s:state_pros) ret_ts.addToLabel(state,s); //adding tags
+            }
+        }
+       //TSTransition<Pair<Map<String, Boolean>, Map<String, Boolean>>,Map<String, Boolean>> tsTransition =new TSTransition();
+
+       return ret_ts;
     }
 
     /**
