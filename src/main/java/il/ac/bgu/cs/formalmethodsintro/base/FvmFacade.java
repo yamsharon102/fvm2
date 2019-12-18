@@ -612,6 +612,18 @@ public class FvmFacade {
        return ret_ts;
     }
 
+    private Map<String,Object> get_values(List<String> list){
+        Map<String,Object> ret=new HashMap<>();int begin=0;
+        for (String s: list){
+            begin=s.indexOf(":=");
+            String var=s.substring(0,begin);
+            String val=s.substring(begin+2);
+            Integer v=new Integer(val);
+            ret.put(var,v);
+        }
+        return ret;
+    }
+
     /**
      * Creates a {@link TransitionSystem} from a program graph.
      *
@@ -625,7 +637,53 @@ public class FvmFacade {
      */
     public <L, A> TransitionSystem<Pair<L, Map<String, Object>>, A, String> transitionSystemFromProgramGraph(
             ProgramGraph<L, A> pg, Set<ActionDef> actionDefs, Set<ConditionDef> conditionDefs) {
-        throw new java.lang.UnsupportedOperationException();
+        TransitionSystem<Pair<L, Map<String, Object>>,A,String> ret_ts=new TransitionSystem<>();
+        Set<Pair<L, Map<String, Object>>> init_states=new HashSet<>();
+        for (L s: pg.getInitialLocations()){
+            for (List<String> list_s:pg.getInitalizations()){
+                Map<String, Object> evaluated=new HashMap<>();
+                evaluated=get_values(list_s);
+                Pair<L, Map<String, Object>> p_s=new Pair<L, Map<String, Object>>(s,evaluated);
+                ret_ts.addInitialState(p_s);
+                ret_ts.addToLabel(p_s,p_s.first.toString());
+                init_states.add(p_s);
+            }
+        }
+            Set<Pair<L, Map<String, Object>>> send_set=new HashSet<>(init_states);
+            Set<Pair<L, Map<String, Object>>> got_set=new HashSet<>(init_states);
+            do {
+                send_set=got_set;
+                got_set=get_new_states(ret_ts,pg,actionDefs,conditionDefs,send_set);
+            }while(got_set.size()>0);
+
+        return ret_ts;
+    }
+    /**
+     * Creates a {@link TransitionSystem} from a program graph.
+     * @param <L> Type of program graph locations.
+     * @param <A> Type of program graph actions.
+     * @param pg The program graph to be translated into a transition system.
+     * @param actionDefs Defines the effect of each action.
+     * @param conditionDefs Defines the conditions (guards) of the program graph.
+     * @return A transition system representing {@code pg}.
+     */
+    private<L,A> Set<Pair<L, Map<String, Object>>> get_new_states( TransitionSystem<Pair<L, Map<String, Object>>, A, String> ret_ts,ProgramGraph<L, A> pg, Set<ActionDef> actionDefs, Set<ConditionDef> conditionDefs, Set<Pair<L, Map<String, Object>>> init_states){
+        Set<Pair<L, Map<String, Object>>> ret_set=new HashSet<>();
+        for(Pair<L, Map<String, Object>> p_init :init_states){
+            for (PGTransition<L, A> p:pg.getTransitions()){
+                if (p.getFrom()==p_init){
+                    if(ConditionDef.evaluate(conditionDefs,p_init.second,p.getCondition())){
+                        Map<String, Object> new_eval=ActionDef.effect(actionDefs,p_init.second,p.getAction());
+                        Pair<L, Map<String, Object>> new_loc=new Pair<>(p.getTo(),new_eval);
+                        TSTransition<Pair<L, Map<String, Object>>,A> new_tst=new TSTransition<>(p_init,p.getAction(),new_loc);
+                        ret_ts.addTransition(new_tst);
+                        ret_ts.addToLabel(new_loc,p_init.toString());
+                        ret_set.add(new_loc);
+                    }
+                }
+            }
+        }
+        return ret_set;
     }
 
     /**
