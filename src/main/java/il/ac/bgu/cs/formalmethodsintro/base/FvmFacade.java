@@ -9,10 +9,7 @@ import il.ac.bgu.cs.formalmethodsintro.base.channelsystem.ChannelSystem;
 import il.ac.bgu.cs.formalmethodsintro.base.circuits.Circuit;
 import il.ac.bgu.cs.formalmethodsintro.base.exceptions.StateNotFoundException;
 import il.ac.bgu.cs.formalmethodsintro.base.ltl.LTL;
-import il.ac.bgu.cs.formalmethodsintro.base.programgraph.ActionDef;
-import il.ac.bgu.cs.formalmethodsintro.base.programgraph.ConditionDef;
-import il.ac.bgu.cs.formalmethodsintro.base.programgraph.PGTransition;
-import il.ac.bgu.cs.formalmethodsintro.base.programgraph.ProgramGraph;
+import il.ac.bgu.cs.formalmethodsintro.base.programgraph.*;
 import il.ac.bgu.cs.formalmethodsintro.base.transitionsystem.AlternatingSequence;
 import il.ac.bgu.cs.formalmethodsintro.base.transitionsystem.TSTransition;
 import il.ac.bgu.cs.formalmethodsintro.base.transitionsystem.TransitionSystem;
@@ -686,6 +683,68 @@ public class FvmFacade {
         return ret_set;
     }
 
+    private <L,A> ProgramGraph<List<L>, A> get_list_pg_from_pair(ProgramGraph<Pair<L, L>, A> pg_p){
+
+        ProgramGraph<List<L>, A> ret=new ProgramGraph<>();
+        for(List<String> initalization:pg_p.getInitalizations()) ret.addInitalization(initalization);
+        for (Pair<L,L> p:pg_p.getLocations()){
+            List<L> list=new LinkedList<>();
+            list.add(p.first);list.add(p.second);
+            ret.addLocation(list);
+            if(pg_p.getInitialLocations().contains(p)) ret.setInitial(list,true);
+
+        }
+        for(PGTransition<Pair<L,L>,A> t:pg_p.getTransitions()){
+            List<L> list_from=new LinkedList<>();
+            Pair<L,L> p=t.getFrom();
+            list_from.add(p.first);list_from.add(p.second);
+            List<L> list_to=new LinkedList<>();
+            p=t.getFrom();
+            list_to.add(p.first);list_to.add(p.second);
+            PGTransition<List<L>,A> new_t=new PGTransition<>(list_from,t.getCondition(),t.getAction(),list_to);
+            ret.addTransition(new_t);
+        }
+
+        return ret;
+    }
+    private <L,A> ProgramGraph<List<L>, A> get_list_pg_from_pair_with_first_list(ProgramGraph<Pair<List<L>, L>, A> pg_p){
+
+        ProgramGraph<List<L>, A> ret=new ProgramGraph<>();
+        for(List<String> initalization:pg_p.getInitalizations()) ret.addInitalization(initalization);
+        for (Pair<List<L>,L> p:pg_p.getLocations()){
+            List<L> list=new LinkedList<>();
+            list.addAll(p.first);list.add(p.second);
+            ret.addLocation(list);
+            if(pg_p.getInitialLocations().contains(p)) ret.setInitial(list,true);
+
+        }
+        for(PGTransition<Pair<List<L>,L>,A> t:pg_p.getTransitions()){
+            List<L> list_from=new LinkedList<>();
+            Pair<List<L>,L> p=t.getFrom();
+            list_from.addAll(p.first);list_from.add(p.second);
+            List<L> list_to=new LinkedList<>();
+            p=t.getFrom();
+            list_to.addAll(p.first);list_to.add(p.second);
+            PGTransition<List<L>,A> new_t=new PGTransition<>(list_from,t.getCondition(),t.getAction(),list_to);
+            ret.addTransition(new_t);
+        }
+
+        return ret;
+    }
+    private<L,A> ProgramGraph<List<L>, A> get_pg_from_cs(ChannelSystem<L, A> cs){
+        ProgramGraph<List<L>, A> ret=new ProgramGraph<>();
+        List<ProgramGraph<L, A>> programGraphs=cs.getProgramGraphs();
+        if(programGraphs.size()>=2){
+            ProgramGraph<Pair<L, L>, A> fist_pg=interleave(programGraphs.get(0),programGraphs.get(1));
+            ret=get_list_pg_from_pair(fist_pg);
+            for (int i=2;i<programGraphs.size();i++){
+                ProgramGraph<Pair<List<L>, L>, A> new_pg=interleave(ret,programGraphs.get(i));
+                ret=get_list_pg_from_pair_with_first_list(new_pg);
+            }
+        }
+        return ret;
+    }
+
     /**
      * Creates a transition system representing channel system {@code cs}.
      *
@@ -695,9 +754,20 @@ public class FvmFacade {
      * @return A transition system representing {@code cs}.
      */
     public <L, A> TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> transitionSystemFromChannelSystem(
-            ChannelSystem<L, A> cs) {
-        throw new java.lang.UnsupportedOperationException();
+            ChannelSystem<L, A> cs ) {
+
+        Set<ActionDef> actions = Collections.singleton(new ParserBasedActDef());
+        Set<ConditionDef> conditions = Collections.singleton(new ParserBasedCondDef());
+        return transitionSystemFromChannelSystem(cs, actions, conditions);
     }
+
+    public <L, A> TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> transitionSystemFromChannelSystem(
+            ChannelSystem<L, A> cs, Set<ActionDef> actions, Set<ConditionDef> conditions) {
+        TransitionSystem<Pair<List<L>, Map<String, Object>>, A, String> ret_ts;
+        ret_ts=transitionSystemFromProgramGraph(get_pg_from_cs(cs),actions,conditions);
+        return ret_ts;
+    }
+
 
     /**
      * Construct a program graph from nanopromela code.
