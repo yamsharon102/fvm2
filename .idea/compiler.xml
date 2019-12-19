@@ -9,8 +9,8 @@
         <module name="FormalMethodsIntro-Base" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel>
-      <module name="FormalMethodsIntro-Base" target="11" />
+    <bytecodeTargetLevel target="9">
+      <module name="FormalMethodsIntro-Base" target="9" />
     </bytecodeTargetLevel>
   </component>
 </project>
