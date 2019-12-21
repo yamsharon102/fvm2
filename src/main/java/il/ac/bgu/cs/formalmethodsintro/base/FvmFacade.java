@@ -824,6 +824,8 @@ public class FvmFacade {
             pgTransitions = subAss(context);
         else if (stmtContext.stmt() != null)
             pgTransitions = subStmt(stmtContext.stmt());
+        else
+            throw new  Exception("Code is invalid");
         return pgTransitions;
     }
 
@@ -842,8 +844,13 @@ public class FvmFacade {
                     else
                         ret_set.add(new PGTransition(from, getCond(option, transition), transition.getAction(), transition.getTo()+";"+from));
                 }
-                else
-                    ret_set.add(transition);
+                else {
+                    String from1 = transition.getFrom().toString().isEmpty() ? "" : transition.getFrom().toString() + ";";
+                    String to1 = transition.getTo().toString().isEmpty() ? "" : transition.getTo().toString() + ";";
+                    ret_set.add(new PGTransition(from1 + from, transition.getCondition(),
+                            transition.getAction(), to1 + from));
+//                    ret_set.add(transition);
+                }
             }
         }
         StringBuilder out_conds = new StringBuilder();
@@ -855,6 +862,10 @@ public class FvmFacade {
     }
 
     private List<PGTransition> subAss(ParserRuleContext context) {
+        return getPgTransitions(context);
+    }
+
+    private List<PGTransition> getPgTransitions(ParserRuleContext context) {
         List<PGTransition> ret_set = new LinkedList<>();
         PGTransition pgTransition = new PGTransition(context.getText(), true_stmt, context.getText(), exit_stmt);
         ret_set.add(pgTransition);
@@ -863,16 +874,13 @@ public class FvmFacade {
 
     private List<PGTransition> subAtomic(ParserRuleContext context) {
         context = (NanoPromelaParser.AtomicstmtContext) context;
-        List<PGTransition> ret_set = new LinkedList<>();
-        PGTransition pgTransition = new PGTransition(context.getText(), true_stmt, context.getText(), exit_stmt);
-        ret_set.add(pgTransition);
-        return ret_set;
+        return getPgTransitions(context);
     }
 
     private List<PGTransition> subSkip(ParserRuleContext context) {
         context = (NanoPromelaParser.SkipstmtContext) context;
         List<PGTransition> ret_set = new LinkedList<>();
-        PGTransition pgTransition = new PGTransition("skip", true_stmt, nothing_stmt, exit_stmt);
+        PGTransition pgTransition = new PGTransition("skip", true_stmt, "skip", exit_stmt);
         ret_set.add(pgTransition);
         return ret_set;
     }
@@ -901,9 +909,13 @@ public class FvmFacade {
         String h = true_stmt;
         if (option.boolexpr().getText().equals(true_stmt)) h = "(true)";
         else if (!(option.boolexpr().getText().equals("true"))) h = "(" + option.boolexpr().getText() + ")";
-        String cond = "";
+        String cond;
         if (stmt_tag.getCondition().equals(true_stmt)) cond = h;
-        else cond = h + " && " + stmt_tag.getCondition();
+        else
+            if (h.equals(""))
+                cond = stmt_tag.getCondition();
+            else
+                cond = "("+h + " && " + stmt_tag.getCondition()+")";
         return cond;
     }
 
@@ -911,15 +923,13 @@ public class FvmFacade {
         List<PGTransition> ret_set = new LinkedList<>();
         List<PGTransition> stmt1 = sub(stmt.get(0));
         for (PGTransition transition : stmt1) {
-            if (transition.getFrom().equals(exit_stmt)) {
-                String from = stmt.get(0).getText() + ';' + stmt.get(1).getText();
-                PGTransition to_add = new PGTransition(from, true_stmt, stmt1.get(0).getFrom(), stmt.get(1).getText());
+            String from = transition.getFrom() + ";" + stmt.get(1).getText();
+            if (transition.getTo().equals(exit_stmt)) {
+                PGTransition to_add = new PGTransition(from, transition.getCondition(), transition.getAction(), stmt.get(1).getText());
                 ret_set.add(to_add);
             } else {
-                String from = transition.getFrom() + ";" + stmt.get(1).getText();
-                String to = transition.getFrom() + ";" + stmt.get(1).getText();
-                PGTransition to_add = new PGTransition(from, true_stmt, transition.getAction(), to);
-                ret_set.add(to_add);
+                    PGTransition to_add = new PGTransition(from, transition.getCondition(), transition.getAction(), transition.getTo()+";"+stmt.get(1).getText());
+                    ret_set.add(to_add);
             }
         }
 
@@ -1041,7 +1051,8 @@ public class FvmFacade {
     }
 
     public static void main(String[] args) {
-        System.out.println("do ok hi".indexOf("do") + 2);
+        String s = "ab;cd";
+        System.out.println(s.substring(s.indexOf(";")+1));
     }
 
 }
