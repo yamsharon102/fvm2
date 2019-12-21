@@ -39,7 +39,7 @@ public class FvmFacade {
 
     private String true_stmt = "";
     private String nothing_stmt = "";
-    private String exit_stmt = "exit";
+    private String exit_stmt = "";
 
     private static FvmFacade INSTANCE = null;
 
@@ -389,7 +389,7 @@ public class FvmFacade {
                                                                                  Set<Pair<S1, S2>> new_states, Set<A> handShakingActions) {
         Set<TSTransition<Pair<S1, S2>, A>> ret_set = new HashSet<>();
         for (TSTransition<S1, A> transition1 : ts1.getTransitions()) {
-            if (!(handShakingActions.contains(transition1.getAction())))
+            if (!(handShakingActions.contains(transition1.getAction()))) {
                 for (Pair<S1, S2> state1 : new_states)
                     if (state1.first.equals(transition1.getFrom()))
                         ret_set.add(new TSTransition<>(state1, transition1.getAction(),
@@ -402,6 +402,16 @@ public class FvmFacade {
                                             transition2.getAction().equals(transition1.getAction()))
                                         ret_set.add(new TSTransition<>(state1, transition1.getAction(),
                                                 new Pair<>(transition1.getTo(), transition2.getTo())));
+            }
+            else{
+                for (TSTransition<S2, A> transition2 : ts2.getTransitions()){
+                    if (transition2.getAction().equals(transition1.getAction())){
+                        ret_set.add(new TSTransition<>(new Pair<>(transition1.getFrom(), transition2.getFrom()),
+                                transition1.getAction(),
+                                new Pair<>(transition1.getTo(), transition2.getTo())));
+                    }
+                }
+            }
         }
         for (TSTransition<S2, A> transition2 : ts2.getTransitions())
             if (!(handShakingActions.contains(transition2.getAction())))
@@ -434,8 +444,6 @@ public class FvmFacade {
         for (TSTransition<Pair<S1, S2>, A> transition : new_transitions)
             ret_ST.addTransition(transition);
         ret_ST.addAllAtomicPropositions(new_APs);
-        for (Pair<S1, S2> state : L_function.keySet())
-            ret_ST.addToLabel(state, (P) L_function.get(state));
 
         return ret_ST;
     }
@@ -450,6 +458,20 @@ public class FvmFacade {
             L_function.put(state, curr_AP);
         }
         return L_function;
+    }
+
+    private <P, A, S2, S1> TransitionSystem<Pair<S1,S2>,A,P> setLabels(TransitionSystem<Pair<S1,S2>,A,P> ret_st, Set<Pair<S1,S2>> new_states,
+                                                                       TransitionSystem<S1,A,P> ts1, TransitionSystem<S2,A,P> ts2) {
+        for (Pair<S1, S2> state : new_states){
+            Set<P> labels1 = ts1.getLabel(state.first);
+            for (P label1: labels1)
+                ret_st.addToLabel(state, label1);
+            Set<P> labels2 = (ts2.getLabel(state.second));
+            for (P label2: labels2)
+                ret_st.addToLabel(state, label2);
+        }
+
+        return ret_st;
     }
 
     /**
@@ -467,7 +489,8 @@ public class FvmFacade {
     public <S1, S2, A, P> TransitionSystem<Pair<S1, S2>, A, P> interleave(TransitionSystem<S1, A, P> ts1,
                                                                           TransitionSystem<S2, A, P> ts2, Set<A> handShakingActions) {
 
-        //States
+
+        // States
         Set<Pair<S1, S2>> new_states = getStatesInterleave(ts1, ts2);
 
         // Initials
@@ -496,6 +519,8 @@ public class FvmFacade {
         // Create Transition System
         TransitionSystem<Pair<S1, S2>, A, P> ret_ST = createTS(new_states, initials, new_actions
                 , new_transitions, new_APs, L_function);
+
+        ret_ST = setLabels(ret_ST, new_states, ts1, ts2);
 
         return ret_ST;
     }
@@ -782,7 +807,7 @@ public class FvmFacade {
 
     private List<PGTransition> sub(StmtContext stmtContext) throws Exception {
         ParserRuleContext context;
-        List<PGTransition> pgTransitions;
+        List<PGTransition> pgTransitions = null;
         if ((context = stmtContext.dostmt()) != null)
             pgTransitions = subDo(context);
         else if ((context = stmtContext.ifstmt()) != null)
@@ -799,7 +824,7 @@ public class FvmFacade {
             pgTransitions = subAss(context);
         else if (stmtContext.stmt() != null)
             pgTransitions = subStmt(stmtContext.stmt());
-        return null;
+        return pgTransitions;
     }
 
     private List<PGTransition> subDo(ParserRuleContext context) throws Exception {
@@ -886,7 +911,7 @@ public class FvmFacade {
         List<PGTransition> ret_set = new LinkedList<>();
         List<PGTransition> stmt1 = sub(stmt.get(0));
         for (PGTransition transition : stmt1) {
-            if (transition.getFrom().equals("exit")) {
+            if (transition.getFrom().equals(exit_stmt)) {
                 String from = stmt.get(0).getText() + ';' + stmt.get(1).getText();
                 PGTransition to_add = new PGTransition(from, true_stmt, stmt1.get(0).getFrom(), stmt.get(1).getText());
                 ret_set.add(to_add);
@@ -913,8 +938,8 @@ public class FvmFacade {
      */
     public ProgramGraph<String, String> programGraphFromNanoPromela(String filename) throws Exception {
         StmtContext stmtContext = NanoPromelaFileReader.pareseNanoPromelaFile(filename);
-        List<PGTransition> locations = sub(stmtContext);
-        return makeGraph(stmtContext, locations);
+        List<PGTransition> transitions = sub(stmtContext);
+        return makeGraph(stmtContext, transitions);
     }
 
     /**
@@ -926,8 +951,8 @@ public class FvmFacade {
      */
     public ProgramGraph<String, String> programGraphFromNanoPromelaString(String nanopromela) throws Exception {
         StmtContext stmtContext = NanoPromelaFileReader.pareseNanoPromelaString(nanopromela);
-        List<PGTransition> locations = sub(stmtContext);
-        return makeGraph(stmtContext, locations);
+        List<PGTransition> transitions = sub(stmtContext);
+        return makeGraph(stmtContext, transitions);
     }
 
     /**
@@ -939,18 +964,17 @@ public class FvmFacade {
      */
     public ProgramGraph<String, String> programGraphFromNanoPromela(InputStream inputStream) throws Exception {
         StmtContext stmtContext = NanoPromelaFileReader.parseNanoPromelaStream(inputStream);
-        List<PGTransition> locations = sub(stmtContext);
-        return makeGraph(stmtContext, locations);
+        List<PGTransition> transitions = sub(stmtContext);
+        return makeGraph(stmtContext, transitions);
     }
 
-    private ProgramGraph<String, String> makeGraph(StmtContext stmtContext, List<PGTransition> locations) {
+    private ProgramGraph<String, String> makeGraph(StmtContext stmtContext, List<PGTransition> transitions) {
         ProgramGraph<String, String> ret_graph = createProgramGraph();
-//        for (String loc : locations){
-//            ret_graph.addLocation(loc);
-//            if (loc.equals(stmtContext.getText()))
-//                ret_graph.setInitial(loc, true);
-//        }
-//        //TODO
+        for (PGTransition transition: transitions) {
+            if (transition.getFrom().equals(stmtContext.getText()))
+                ret_graph.setInitial((String)transition.getFrom(), true);
+            ret_graph.addTransition(transition);
+        }
         return ret_graph;
     }
 
@@ -1017,7 +1041,7 @@ public class FvmFacade {
     }
 
     public static void main(String[] args) {
-        "do ok hi".indexOf("do");
+        System.out.println("do ok hi".indexOf("do") + 2);
     }
 
 }

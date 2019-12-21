@@ -14,6 +14,7 @@ import il.ac.bgu.cs.formalmethodsintro.base.exceptions.DeletionOfAttachedStateEx
 import il.ac.bgu.cs.formalmethodsintro.base.exceptions.FVMException;
 import il.ac.bgu.cs.formalmethodsintro.base.exceptions.StateNotFoundException;
 import il.ac.bgu.cs.formalmethodsintro.base.exceptions.TransitionSystemPart;
+import il.ac.bgu.cs.formalmethodsintro.base.programgraph.PGTransition;
 
 /**
  * Interface of a transition system, as defined in page 20 of the book.
@@ -74,7 +75,7 @@ public class TransitionSystem<STATE, ACTION, ATOMIC_PROPOSITION> {
      * @throws FVMException If the action in use by a transition.
      */
     public void removeAction(ACTION action) throws FVMException {
-        for (var t : transitions) {
+        for (TSTransition t : transitions) {
             if (t.getAction().equals(action)) {
                 throw new DeletionOfAttachedActionException(action, TransitionSystemPart.TRANSITIONS);
             }
@@ -102,7 +103,6 @@ public class TransitionSystem<STATE, ACTION, ATOMIC_PROPOSITION> {
      * mandatory - it is added to the system it not.
      *
      * @param aState A state to add to the set of initial states.
-     * @param isInitial Whether {@code state} should be an initial state of
      * {@code this}.
      */
     public void addInitialState(STATE aState) {
