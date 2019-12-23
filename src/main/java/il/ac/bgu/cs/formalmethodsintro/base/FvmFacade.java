@@ -682,14 +682,32 @@ public class FvmFacade {
                 init_states.add(p_s);
             }
         }
+            List<PGTransition<L, A>> curr_trans=new LinkedList<>(pg.getTransitions());
             Set<Pair<L, Map<String, Object>>> send_set=new HashSet<>(init_states);
             Set<Pair<L, Map<String, Object>>> got_set=new HashSet<>(init_states);
+        Pair<Set<Pair<L, Map<String, Object>>>,List<PGTransition<L, A>>> pair=new Pair<>(send_set,curr_trans);
             do {
                 send_set=got_set;
-                got_set=get_new_states(ret_ts,pg,actionDefs,conditionDefs,send_set);
+                pair=get_new_states(ret_ts,pg,actionDefs,conditionDefs,send_set,curr_trans);
+                got_set=pair.first;
+                curr_trans.removeAll(pair.second);
             }while(got_set.size()>0);
 
         return ret_ts;
+    }
+
+    private<L,A> List<PGTransition<L, A>> get_trans(L tofind,List<PGTransition<L, A>> trans){
+        List<PGTransition<L, A>> ret=new LinkedList<>();
+        for (PGTransition<L, A> t:trans) {
+            if(t.getFrom().equals(tofind)) ret.add(t);
+        }
+        return ret;
+    }
+    private <L,A> void add_atomic(Pair<L, Map<String, Object>> new_loc,Map<String, Object> new_eval, TransitionSystem<Pair<L, Map<String, Object>>, A, String> ret_ts){
+        for (String s:new_eval.keySet()){
+            String toadd=s+" = "+new_eval.get(s).toString();
+            ret_ts.addToLabel(new_loc,toadd);
+        }
     }
     /**
      * Creates a {@link TransitionSystem} from a program graph.
@@ -700,23 +718,28 @@ public class FvmFacade {
      * @param conditionDefs Defines the conditions (guards) of the program graph.
      * @return A transition system representing {@code pg}.
      */
-    private<L,A> Set<Pair<L, Map<String, Object>>> get_new_states( TransitionSystem<Pair<L, Map<String, Object>>, A, String> ret_ts,ProgramGraph<L, A> pg, Set<ActionDef> actionDefs, Set<ConditionDef> conditionDefs, Set<Pair<L, Map<String, Object>>> init_states){
+    private<L,A> Pair<Set<Pair<L, Map<String, Object>>>,List<PGTransition<L, A>>> get_new_states( TransitionSystem<Pair<L, Map<String, Object>>, A, String> ret_ts,ProgramGraph<L, A> pg, Set<ActionDef> actionDefs, Set<ConditionDef> conditionDefs, Set<Pair<L, Map<String, Object>>> init_states,List<PGTransition<L, A>> curr_trans){
         Set<Pair<L, Map<String, Object>>> ret_set=new HashSet<>();
+        List<PGTransition<L, A>> valid_trans,ret_trans=new LinkedList<>();
         for(Pair<L, Map<String, Object>> p_init :init_states){
-            for (PGTransition<L, A> p:pg.getTransitions()){
-                if (p.getFrom()==p_init){
+            valid_trans=get_trans(p_init.first,curr_trans);
+            for (PGTransition<L, A> p:valid_trans){
+                if (p.getFrom().equals(p_init.first)){
                     if(ConditionDef.evaluate(conditionDefs,p_init.second,p.getCondition())){
+                        ret_trans.add(p);
                         Map<String, Object> new_eval=ActionDef.effect(actionDefs,p_init.second,p.getAction());
                         Pair<L, Map<String, Object>> new_loc=new Pair<>(p.getTo(),new_eval);
                         TSTransition<Pair<L, Map<String, Object>>,A> new_tst=new TSTransition<>(p_init,p.getAction(),new_loc);
                         ret_ts.addTransition(new_tst);
-                        ret_ts.addToLabel(new_loc,p_init.toString());
+                        //ret_ts.addToLabel(new_loc,p_init.toString());
                         ret_set.add(new_loc);
+                        ret_ts.addToLabel(new_loc,new_loc.first.toString());
+                        add_atomic(new_loc,new_eval,ret_ts);
                     }
                 }
             }
         }
-        return ret_set;
+        return new Pair<>(ret_set,ret_trans);
     }
 
     private <L,A> ProgramGraph<List<L>, A> get_list_pg_from_pair(ProgramGraph<Pair<L, L>, A> pg_p){
