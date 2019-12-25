@@ -101,7 +101,7 @@ public class TransitionSystem<STATE, ACTION, ATOMIC_PROPOSITION> {
      * {@code this}.
      */
     public void addInitialState(STATE aState) throws FVMException {
-        if (!states.contains(aState)) throw new FVMException("");
+//        if (!states.contains(aState)) throw new FVMException("");
         addState(aState);
         initialStates.add(aState);
     }
@@ -167,9 +167,6 @@ public class TransitionSystem<STATE, ACTION, ATOMIC_PROPOSITION> {
      * @throws FVMException If the states or the action does not exist.
      */
     public void addTransition(TSTransition<STATE, ACTION> t) throws FVMException {
-        if (!actions.contains(t.getAction()) | !states.contains(t.getFrom()) |
-                !states.contains(t.getTo()))
-            throw new InvalidTransitionException(t);
 
         addState(t.getFrom());
         addState(t.getTo());

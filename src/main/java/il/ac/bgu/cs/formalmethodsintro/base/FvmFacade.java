@@ -715,7 +715,9 @@ public class FvmFacade {
             }else{
                 Map<String, Object> evaluated=new HashMap<>();
                 Pair<L, Map<String, Object>> p_s=new Pair<L, Map<String, Object>>(s,evaluated);
+                ret_ts.addState(p_s);
                 ret_ts.addInitialState(p_s);
+                ret_ts.addAtomicProposition(p_s.first.toString());
                 ret_ts.addToLabel(p_s,p_s.first.toString());
                 init_states.add(p_s);
             }
@@ -745,6 +747,7 @@ public class FvmFacade {
         if(new_eval.size()>0){
             for (String s:new_eval.keySet()){
                 String toadd=s+" = "+new_eval.get(s).toString();
+                ret_ts.addAtomicProposition(toadd);
                 ret_ts.addToLabel(new_loc,toadd);
             }
         }
@@ -774,7 +777,10 @@ public class FvmFacade {
                             ret_ts.addTransition(new_tst);
                             //ret_ts.addToLabel(new_loc,p_init.toString());
                             ret_set.add(new_loc);
-                            if(new_loc.second!=null)ret_ts.addToLabel(new_loc,new_loc.second.toString());
+                            if(new_loc.second!=null){
+                                ret_ts.addAtomicProposition(new_loc.second.toString());
+                                ret_ts.addToLabel(new_loc,new_loc.second.toString());
+                            }
                             if(new_eval!=null)add_atomic(new_loc,new_eval,ret_ts);
                         }
                     }
