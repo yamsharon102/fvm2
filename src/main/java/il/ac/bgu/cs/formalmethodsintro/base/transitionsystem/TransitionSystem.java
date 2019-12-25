@@ -8,12 +8,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 
-import il.ac.bgu.cs.formalmethodsintro.base.exceptions.DeletionOfAttachedActionException;
-import il.ac.bgu.cs.formalmethodsintro.base.exceptions.DeletionOfAttachedAtomicPropositionException;
-import il.ac.bgu.cs.formalmethodsintro.base.exceptions.DeletionOfAttachedStateException;
-import il.ac.bgu.cs.formalmethodsintro.base.exceptions.FVMException;
-import il.ac.bgu.cs.formalmethodsintro.base.exceptions.StateNotFoundException;
-import il.ac.bgu.cs.formalmethodsintro.base.exceptions.TransitionSystemPart;
+import il.ac.bgu.cs.formalmethodsintro.base.exceptions.*;
 import il.ac.bgu.cs.formalmethodsintro.base.programgraph.PGTransition;
 
 /**
@@ -105,7 +100,8 @@ public class TransitionSystem<STATE, ACTION, ATOMIC_PROPOSITION> {
      * @param aState A state to add to the set of initial states.
      * {@code this}.
      */
-    public void addInitialState(STATE aState) {
+    public void addInitialState(STATE aState) throws FVMException {
+        if (!states.contains(aState)) throw new FVMException("");
         addState(aState);
         initialStates.add(aState);
     }
@@ -150,6 +146,8 @@ public class TransitionSystem<STATE, ACTION, ATOMIC_PROPOSITION> {
      * @throws FVMException If the state is in use by a transition.
      */
     public void removeState(STATE state) throws FVMException {
+        if (initialStates.contains(state))throw new DeletionOfAttachedStateException(state, TransitionSystemPart.INITIAL_STATES);
+        if (labelingFunction.get(state)!=null) throw new DeletionOfAttachedStateException(state, TransitionSystemPart.TRANSITIONS);
         transitions.stream()
                 .filter((t) -> (t.getFrom().equals(state) || t.getTo().equals(state)))
                 .findFirst().map(t -> {
@@ -169,6 +167,10 @@ public class TransitionSystem<STATE, ACTION, ATOMIC_PROPOSITION> {
      * @throws FVMException If the states or the action does not exist.
      */
     public void addTransition(TSTransition<STATE, ACTION> t) throws FVMException {
+        if (!actions.contains(t.getAction()) | !states.contains(t.getFrom()) |
+                !states.contains(t.getTo()))
+            throw new InvalidTransitionException(t);
+
         addState(t.getFrom());
         addState(t.getTo());
         addAction(t.getAction());
@@ -255,6 +257,9 @@ public class TransitionSystem<STATE, ACTION, ATOMIC_PROPOSITION> {
      * @param l An atomic proposition.
      */
     public void addToLabel(STATE s, ATOMIC_PROPOSITION l) {
+        if (!atomicPropositions.contains(l) | !states.contains(s))
+            throw new InvalidLablingPairException(s, l);
+
         addState(s);
         addAtomicProposition(l);
         Set<ATOMIC_PROPOSITION> labelSet = labelingFunction.get(s);

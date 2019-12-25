@@ -7,6 +7,7 @@ import il.ac.bgu.cs.formalmethodsintro.base.automata.Automaton;
 import il.ac.bgu.cs.formalmethodsintro.base.automata.MultiColorAutomaton;
 import il.ac.bgu.cs.formalmethodsintro.base.channelsystem.ChannelSystem;
 import il.ac.bgu.cs.formalmethodsintro.base.circuits.Circuit;
+import il.ac.bgu.cs.formalmethodsintro.base.exceptions.ActionNotFoundException;
 import il.ac.bgu.cs.formalmethodsintro.base.exceptions.StateNotFoundException;
 import il.ac.bgu.cs.formalmethodsintro.base.ltl.LTL;
 import il.ac.bgu.cs.formalmethodsintro.base.programgraph.*;
@@ -133,9 +134,13 @@ public class FvmFacade {
      */
     public <S, A, P> boolean isExecutionFragment(TransitionSystem<S, A, P> ts, AlternatingSequence<S, A> e) {
         AlternatingSequence<S, A> curr = e;
+
         for (int i = 0; i < e.size(); i = i + 2) {
+            if (curr.tail().isEmpty()) return true;
             S s1 = curr.head();
+            if (!ts.getStates().contains(s1)) throw new StateNotFoundException("");
             A a = curr.tail().head();
+            if (!ts.getActions().contains(a)) throw new ActionNotFoundException("");
             curr = curr.tail().tail();
             S s2 = curr.head();
             // Checks if <s1,a,s2> is a valid transition.
@@ -159,7 +164,7 @@ public class FvmFacade {
      * {@code ts}.
      */
     public <S, A, P> boolean isInitialExecutionFragment(TransitionSystem<S, A, P> ts, AlternatingSequence<S, A> e) {
-        return isExecution(ts, e) && ts.getInitialStates().contains(e.head());
+        return isExecutionFragment(ts, e) && ts.getInitialStates().contains(e.head());
     }
 
     /**
@@ -189,6 +194,7 @@ public class FvmFacade {
      * @throws StateNotFoundException if {@code s} is not a state of {@code ts}.
      */
     public <S, A> boolean isStateTerminal(TransitionSystem<S, A, ?> ts, S s) {
+        if (!ts.getStates().contains(s)) throw new StateNotFoundException("");
         for (TSTransition<S, A> transition : ts.getTransitions())
             if (transition.getFrom().equals(s))
                 return false;
