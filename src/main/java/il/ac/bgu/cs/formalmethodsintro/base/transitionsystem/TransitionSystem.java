@@ -254,8 +254,8 @@ public class TransitionSystem<STATE, ACTION, ATOMIC_PROPOSITION> {
      * @param l An atomic proposition.
      */
     public void addToLabel(STATE s, ATOMIC_PROPOSITION l) {
-        if (!atomicPropositions.contains(l) | !states.contains(s))
-            throw new InvalidLablingPairException(s, l);
+//        if (!atomicPropositions.contains(l) | !states.contains(s))
+//            throw new InvalidLablingPairException(s, l);
 
         addState(s);
         addAtomicProposition(l);
