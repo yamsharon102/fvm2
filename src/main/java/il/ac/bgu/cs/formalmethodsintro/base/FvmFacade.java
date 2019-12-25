@@ -536,6 +536,17 @@ public class FvmFacade {
         return new ProgramGraph<>();
     }
 
+    public Set<List<String>> create_initialization(Set<List<String>>  init){
+        Set<List<String>> retl;
+        if(init.size()>0) retl=init;
+        else {
+            retl=new HashSet<>();
+            List<String> empty=new LinkedList<>();
+            empty.add("");
+            retl.add(empty);
+        }
+        return retl;
+    }
     /**
      * Interleaves two program graphs.
      *
@@ -548,10 +559,13 @@ public class FvmFacade {
      */
     public <L1, L2, A> ProgramGraph<Pair<L1, L2>, A> interleave(ProgramGraph<L1, A> pg1, ProgramGraph<L2, A> pg2) {
         ProgramGraph<Pair<L1,L2>,A> ret_graph=createProgramGraph();
-        for(List<String> l1:pg1.getInitalizations()){
-            for(List<String> l2:pg2.getInitalizations()){
+        Set<List<String>> list1=create_initialization(pg1.getInitalizations()),list2=create_initialization(pg2.getInitalizations());
+
+        for(List<String> l1:list1){
+            for(List<String> l2:list2){
                 List<String> l=new LinkedList<>();
                 l.addAll(l1);l.addAll(l2);
+                l.remove("");
                 ret_graph.addInitalization(l);
             }
         }
@@ -648,11 +662,21 @@ public class FvmFacade {
     private Map<String,Object> get_values(List<String> list){
         Map<String,Object> ret=new HashMap<>();int begin=0;
         for (String s: list){
-            begin=s.indexOf(":=");
-            String var=s.substring(0,begin);
-            String val=s.substring(begin+2);
-            Integer v=new Integer(val);
-            ret.put(var,v);
+            if(s.contains(":=")){
+                begin=s.indexOf(":=");
+                String var=s.substring(0,begin);
+                String val=s.substring(begin+2);
+                Integer v=new Integer(val);
+                ret.put(var,v);
+            }
+            else{
+                    if(s.contains("?")) begin=s.indexOf("?");
+                    else if(s.contains("!")) begin=s.indexOf("!");
+                    String var=s.substring(0,begin);
+                    String val=s.substring(begin+2);
+                    Integer v=new Integer(val);
+                    ret.put(var,v);
+            }
         }
         return ret;
     }
@@ -673,9 +697,17 @@ public class FvmFacade {
         TransitionSystem<Pair<L, Map<String, Object>>,A,String> ret_ts=new TransitionSystem<>();
         Set<Pair<L, Map<String, Object>>> init_states=new HashSet<>();
         for (L s: pg.getInitialLocations()){
-            for (List<String> list_s:pg.getInitalizations()){
+            if(pg.getInitalizations().size()>0){
+                for (List<String> list_s:pg.getInitalizations()){
+                    Map<String, Object> evaluated=new HashMap<>();
+                    evaluated=get_values(list_s);
+                    Pair<L, Map<String, Object>> p_s=new Pair<L, Map<String, Object>>(s,evaluated);
+                    ret_ts.addInitialState(p_s);
+                    ret_ts.addToLabel(p_s,p_s.second.toString());
+                    init_states.add(p_s);
+                }
+            }else{
                 Map<String, Object> evaluated=new HashMap<>();
-                evaluated=get_values(list_s);
                 Pair<L, Map<String, Object>> p_s=new Pair<L, Map<String, Object>>(s,evaluated);
                 ret_ts.addInitialState(p_s);
                 ret_ts.addToLabel(p_s,p_s.first.toString());
@@ -704,9 +736,11 @@ public class FvmFacade {
         return ret;
     }
     private <L,A> void add_atomic(Pair<L, Map<String, Object>> new_loc,Map<String, Object> new_eval, TransitionSystem<Pair<L, Map<String, Object>>, A, String> ret_ts){
-        for (String s:new_eval.keySet()){
-            String toadd=s+" = "+new_eval.get(s).toString();
-            ret_ts.addToLabel(new_loc,toadd);
+        if(new_eval.size()>0){
+            for (String s:new_eval.keySet()){
+                String toadd=s+" = "+new_eval.get(s).toString();
+                ret_ts.addToLabel(new_loc,toadd);
+            }
         }
     }
     /**
@@ -728,20 +762,45 @@ public class FvmFacade {
                     if(ConditionDef.evaluate(conditionDefs,p_init.second,p.getCondition())){
                         ret_trans.add(p);
                         Map<String, Object> new_eval=ActionDef.effect(actionDefs,p_init.second,p.getAction());
-                        Pair<L, Map<String, Object>> new_loc=new Pair<>(p.getTo(),new_eval);
-                        TSTransition<Pair<L, Map<String, Object>>,A> new_tst=new TSTransition<>(p_init,p.getAction(),new_loc);
-                        ret_ts.addTransition(new_tst);
-                        //ret_ts.addToLabel(new_loc,p_init.toString());
-                        ret_set.add(new_loc);
-                        ret_ts.addToLabel(new_loc,new_loc.first.toString());
-                        add_atomic(new_loc,new_eval,ret_ts);
+                        if(new_eval!=null){
+                            Pair<L, Map<String, Object>> new_loc=new Pair<>(p.getTo(),new_eval);
+                            TSTransition<Pair<L, Map<String, Object>>,A> new_tst=new TSTransition<>(p_init,p.getAction(),new_loc);
+                            ret_ts.addTransition(new_tst);
+                            //ret_ts.addToLabel(new_loc,p_init.toString());
+                            ret_set.add(new_loc);
+                            if(new_loc.second!=null)ret_ts.addToLabel(new_loc,new_loc.second.toString());
+                            if(new_eval!=null)add_atomic(new_loc,new_eval,ret_ts);
+                        }
                     }
                 }
             }
         }
         return new Pair<>(ret_set,ret_trans);
     }
+    private <L,A> ProgramGraph<List<L>, A> get_list_pg_from_one_pg(ProgramGraph<L, A> pg_p){
 
+        ProgramGraph<List<L>, A> ret=new ProgramGraph<>();
+        for(List<String> initalization:pg_p.getInitalizations()) ret.addInitalization(initalization);
+        for (L p:pg_p.getLocations()){
+            List<L> list=new LinkedList<>();
+            list.add(p);
+            ret.addLocation(list);
+            if(pg_p.getInitialLocations().contains(p)) ret.setInitial(list,true);
+
+        }
+        for(PGTransition<L,A> t:pg_p.getTransitions()){
+            List<L> list_from=new LinkedList<>();
+            L p=t.getFrom();
+            list_from.add(p);
+            List<L> list_to=new LinkedList<>();
+            p=t.getFrom();
+            list_to.add(p);
+            PGTransition<List<L>,A> new_t=new PGTransition<>(list_from,t.getCondition(),t.getAction(),list_to);
+            ret.addTransition(new_t);
+        }
+
+        return ret;
+    }
     private <L,A> ProgramGraph<List<L>, A> get_list_pg_from_pair(ProgramGraph<Pair<L, L>, A> pg_p){
 
         ProgramGraph<List<L>, A> ret=new ProgramGraph<>();
@@ -801,6 +860,7 @@ public class FvmFacade {
                 ret=get_list_pg_from_pair_with_first_list(new_pg);
             }
         }
+        else ret= get_list_pg_from_one_pg(programGraphs.get(0));
         return ret;
     }
 
