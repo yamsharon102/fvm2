@@ -23,7 +23,9 @@ import il.ac.bgu.cs.formalmethodsintro.base.transitionsystem.AlternatingSequence
 import il.ac.bgu.cs.formalmethodsintro.base.transitionsystem.TSTransition;
 import il.ac.bgu.cs.formalmethodsintro.base.transitionsystem.TransitionSystem;
 import il.ac.bgu.cs.formalmethodsintro.base.util.Pair;
+import il.ac.bgu.cs.formalmethodsintro.base.verification.VerificationFailed;
 import il.ac.bgu.cs.formalmethodsintro.base.verification.VerificationResult;
+import il.ac.bgu.cs.formalmethodsintro.base.verification.VerificationSucceeded;
 import org.antlr.v4.runtime.ParserRuleContext;
 
 
@@ -373,6 +375,16 @@ public class FvmFacade {
         }
         return retSet;
     }
+
+//    public <S, A> Set<S> getExecution(TransitionSystem<S, A, ?> ts, S s) {
+//        // Start with initials, get their posts and so on until dead-end.
+//        List<S> retSet = new LinkedList<>();
+//        Set<S> initialStates = ts.getInitialStates();
+//        for (S s1 : initialStates) {
+//
+//        }
+//        return retSet;
+//    }
 
     /**
      * Compute the synchronous product of two transition systems.
@@ -1085,6 +1097,15 @@ public class FvmFacade {
 
     // UTNTUIL HERERERE
 
+//    private <Saut, P> Set<Saut> automataStates(Automaton<Saut, P> aut){
+//        Set<Saut> ret_set = new HashSet<>();
+//        Map<Saut, Map<Set<P>, Set<Saut>>> transition = aut.getTransitions();
+//        for (Saut currState : transition.keySet()){
+//            ret_set.add(currState);
+//            ret_set.add(transition.ge)
+//        }
+//    }
+
     /**
      * Creates a transition system from a transition system and an automaton.
      *
@@ -1099,7 +1120,54 @@ public class FvmFacade {
      */
     public <Sts, Saut, A, P> TransitionSystem<Pair<Sts, Saut>, A, Saut> product(TransitionSystem<Sts, A, P> ts,
                                                                                 Automaton<Saut, P> aut) {
-        throw new java.lang.UnsupportedOperationException();
+
+        TransitionSystem<Pair<Sts,Saut>,A,Saut> TSXA = new TransitionSystem();
+
+        // Transitions
+        Set<TSTransition<Pair<Sts,Saut>, A>> transitions = getTRANSX(ts,aut);
+        for (TSTransition<Pair<Sts,Saut>, A> trans : transitions)
+            TSXA.addTransition(trans);
+
+        // Initials
+        Set<Pair<Sts,Saut>> IX = getIX(ts, aut);
+        for (Pair<Sts,Saut> I : IX)
+            TSXA.addInitialState(I);
+
+        // Labels
+        for (Pair<Sts,Saut> Stsxa : TSXA.getStates())
+            TSXA.addToLabel(Stsxa, Stsxa.second);
+
+        return TSXA;
+    }
+
+    private <A, Saut, Sts, P> Set<TSTransition<Pair<Sts,Saut>,A>> getTRANSX(TransitionSystem<Sts,A,P> ts, Automaton<Saut,P> aut) {
+        Set<TSTransition<Pair<Sts,Saut>,A>> TSXATrans = new HashSet<>();
+        Set<TSTransition<Sts, A>> tsTrans = ts.getTransitions();
+        Map<Saut, Map<Set<P>, Set<Saut>>> autTrans = aut.getTransitions();
+        for (TSTransition<Sts, A> TStransition : tsTrans)
+            for (Saut q : autTrans.keySet()){
+                Set<Saut> Ps = autTrans.get(q).get(ts.getLabel(TStransition.getTo()));
+                for (Saut p : Ps){
+                    TSTransition<Pair<Sts,Saut>,A> toAdd = new TSTransition<>(
+                            new Pair<>(TStransition.getFrom(), q),
+                            TStransition.getAction(),
+                            new Pair<>(TStransition.getTo(), p)
+                    );
+                    TSXATrans.add(toAdd);
+                }
+            }
+        return TSXATrans;
+    }
+
+    private <A, Saut, Sts, P> Set<Pair<Sts,Saut>> getIX(TransitionSystem<Sts,A,P> ts, Automaton<Saut,P> aut) {
+        Set<Pair<Sts,Saut>> IXs = new HashSet<>();
+        for (Sts s0 : ts.getInitialStates())
+            for (Saut q0 : aut.getInitialStates()){
+                Set<Saut> nexts = aut.nextStates(q0, ts.getLabel(s0));
+                for (Saut q : nexts)
+                    IXs.add(new Pair<>(s0, q));
+            }
+        return IXs;
     }
 
     /**
@@ -1118,7 +1186,85 @@ public class FvmFacade {
      */
     public <S, A, P, Saut> VerificationResult<S> verifyAnOmegaRegularProperty(TransitionSystem<S, A, P> ts,
                                                                               Automaton<Saut, P> aut) {
-        throw new java.lang.UnsupportedOperationException();
+        TransitionSystem<Pair<S, Saut>, A, Saut> ProdTransitionSystem = product(ts, aut);
+        Set<Pair<S, Saut>> reachableStates = reach(ProdTransitionSystem);
+        Set<Pair<S, Saut>> badStates = new HashSet<>();
+        for (Pair<S, Saut> Stsxa : reachableStates)
+            if (aut.getAcceptingStates().contains(ProdTransitionSystem.getLabel(Stsxa)))
+                badStates.add(Stsxa);
+
+        if (badStates.size() == 0) return new VerificationSucceeded<>();
+
+//        All Routes
+
+        Map<Pair<S, Saut>, List> routes = getPairListMap(ProdTransitionSystem);
+
+//        Cycles
+        Map<Pair<S, Saut>, List> cycles = getPairListMap(ProdTransitionSystem, badStates);
+
+        for (Pair<S, Saut> bad : cycles.keySet()){
+            VerificationFailed VF = new VerificationFailed();
+            VF.setCycle(cycles.get(bad));
+            VF.setPrefix(routes.get(bad));
+            return VF;
+        }
+
+        return new VerificationSucceeded<>();
+    }
+
+    private <S, A, Saut> Map<Pair<S, Saut>, List> getPairListMap(TransitionSystem<Pair<S, Saut>, A, Saut> prodTransitionSystem, Set<Pair<S, Saut>> badStates) {
+        Map<Pair<S, Saut>, List> cycles = new HashMap<>();
+        for (Pair<S, Saut> bad : badStates) {
+            ArrayDeque<Pair<S, Saut>> startCycles = new ArrayDeque<>();
+            startCycles.add(bad);
+
+            Map<Pair<S, Saut>, List> badRoutes = new HashMap<>();
+            List<Pair<S, Saut>> start = new LinkedList<>();
+            start.add(bad);
+            badRoutes.put(bad, start);
+            boolean finished = false;
+
+            while (!startCycles.isEmpty() && !finished) {
+                Pair<S, Saut> curr = startCycles.pop();
+                for (Pair<S, Saut> next : post(prodTransitionSystem, curr)){
+                    if (!bad.equals(next) && badRoutes.containsKey(next)) continue;
+                    List route = List.copyOf(badRoutes.get(curr));
+                    route.add(next);
+                    if (next.equals(bad)) {
+                        cycles.put(bad, route);
+                        finished = true;
+                    }
+                    else {
+                        badRoutes.put(next, route);
+                        startCycles.add(next);
+                    }
+                }
+            }
+        }
+        return cycles;
+    }
+
+    private <S, A, Saut> Map<Pair<S, Saut>, List> getPairListMap(TransitionSystem<Pair<S, Saut>, A, Saut> prodTransitionSystem) {
+        Map<Pair<S, Saut>, List> routes = new HashMap<>();
+        ArrayDeque<Pair<S, Saut>> currStates = new ArrayDeque<>(prodTransitionSystem.getInitialStates());
+        for (Pair<S, Saut> init : prodTransitionSystem.getInitialStates()) {
+            List<Pair<S, Saut>> route = new LinkedList<>();
+            route.add(init);
+            routes.put(init, route);
+        }
+
+        while (! currStates.isEmpty()){
+            Pair<S, Saut> curr = currStates.pop();
+            for (Pair<S, Saut> next : post(prodTransitionSystem, curr)) {
+                if (routes.containsKey(next)) continue;
+                List route = List.copyOf(routes.get(curr));
+                route.add(next);
+                routes.put(next, route);
+                currStates.add(next);
+
+            }
+        }
+        return routes;
     }
 
     /**
@@ -1142,7 +1288,23 @@ public class FvmFacade {
      * @return An equivalent automaton with a single set of accepting states.
      */
     public <L> Automaton<?, L> GNBA2NBA(MultiColorAutomaton<?, L> mulAut) {
-        throw new java.lang.UnsupportedOperationException();
+        Automaton<Object, L> NBA = new Automaton<>();
+        int k = mulAut.getColors().size();
+        Set<Integer> colors = mulAut.getColors();
+        for (Object GTranKey : mulAut.getTransitions().keySet()){
+            for (Integer color : colors) {
+                Map<Set<L>, ? extends Set<?>> ActionDest = mulAut.getTransitions().get(GTranKey);
+                for (Set<L> action : ActionDest.keySet()) {
+                    for (Object Dest : ActionDest.get(action))
+                        if (mulAut.getAcceptingStates(color).contains(GTranKey)) { //later
+                            NBA.addTransition(GTranKey, action, Dest);
+                        }
+                }
+
+            }
+        }
+        return null;
+//        throw new java.lang.UnsupportedOperationException();
     }
 
     public static void main(String[] args) {
