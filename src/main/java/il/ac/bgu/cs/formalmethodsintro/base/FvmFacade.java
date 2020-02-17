@@ -1541,6 +1541,21 @@ public class FvmFacade {
 //        throw new java.lang.UnsupportedOperationException();
     }
 
+
+    /**
+     * Verify that a system satisfies an LTL formula under fairness conditions.
+     * @param ts Transition system
+     * @param fc Fairness condition
+     * @param ltl An LTL formula
+     * @param <S>  Type of states in the transition system
+     * @param <A> Type of actions in the transition system
+     * @param <P> Type of atomic propositions in the transition system
+     * @return a VerificationSucceeded object or a VerificationFailed object with a counterexample.
+     */
+    public <S, A, P> VerificationResult<S> verifyFairLTLFormula(TransitionSystem<S, A, P> ts, FairnessCondition<A> fc, LTL<P> ltl){
+        throw new java.lang.UnsupportedOperationException();
+    }
+
     public static void main(String[] args) {
         Set<Integer> check = new HashSet<>();
         check.add(1);
