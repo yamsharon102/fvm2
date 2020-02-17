@@ -12,6 +12,7 @@ import il.ac.bgu.cs.formalmethodsintro.base.circuits.Circuit;
 import il.ac.bgu.cs.formalmethodsintro.base.exceptions.ActionNotFoundException;
 import il.ac.bgu.cs.formalmethodsintro.base.exceptions.StateNotFoundException;
 import il.ac.bgu.cs.formalmethodsintro.base.goal.GoalStructure;
+import il.ac.bgu.cs.formalmethodsintro.base.fairness.FairnessCondition;
 import il.ac.bgu.cs.formalmethodsintro.base.ltl.*;
 import il.ac.bgu.cs.formalmethodsintro.base.programgraph.*;
 import il.ac.bgu.cs.formalmethodsintro.base.nanopromela.NanoPromelaFileReader;
@@ -1430,6 +1431,7 @@ public class FvmFacade {
         }
         return ret;
     }
+
     public <L> Automaton<?, L> LTL2NBA(LTL<L> ltl) {
         Automaton<?, L> ret=new Automaton<>();
         MultiColorAutomaton<Set<LTL<L>>,L> gnba=new MultiColorAutomaton<>();
@@ -1553,7 +1555,7 @@ public class FvmFacade {
      * @return a VerificationSucceeded object or a VerificationFailed object with a counterexample.
      */
     public <S, A, P> VerificationResult<S> verifyFairLTLFormula(TransitionSystem<S, A, P> ts, FairnessCondition<A> fc, LTL<P> ltl){
-        throw new java.lang.UnsupportedOperationException();
+        return null;
     }
 
     public static void main(String[] args) {
