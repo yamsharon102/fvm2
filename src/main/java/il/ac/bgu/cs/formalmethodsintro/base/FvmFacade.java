@@ -1,6 +1,8 @@
 package il.ac.bgu.cs.formalmethodsintro.base;
 
 import java.io.InputStream;
+import java.lang.reflect.Array;
+import java.nio.charset.IllegalCharsetNameException;
 import java.util.*;
 
 import il.ac.bgu.cs.formalmethodsintro.base.automata.Automaton;
@@ -9,7 +11,8 @@ import il.ac.bgu.cs.formalmethodsintro.base.channelsystem.ChannelSystem;
 import il.ac.bgu.cs.formalmethodsintro.base.circuits.Circuit;
 import il.ac.bgu.cs.formalmethodsintro.base.exceptions.ActionNotFoundException;
 import il.ac.bgu.cs.formalmethodsintro.base.exceptions.StateNotFoundException;
-import il.ac.bgu.cs.formalmethodsintro.base.ltl.LTL;
+import il.ac.bgu.cs.formalmethodsintro.base.goal.GoalStructure;
+import il.ac.bgu.cs.formalmethodsintro.base.ltl.*;
 import il.ac.bgu.cs.formalmethodsintro.base.programgraph.*;
 import il.ac.bgu.cs.formalmethodsintro.base.nanopromela.NanoPromelaFileReader;
 import il.ac.bgu.cs.formalmethodsintro.base.nanopromela.NanoPromelaParser;
@@ -27,6 +30,9 @@ import il.ac.bgu.cs.formalmethodsintro.base.verification.VerificationFailed;
 import il.ac.bgu.cs.formalmethodsintro.base.verification.VerificationResult;
 import il.ac.bgu.cs.formalmethodsintro.base.verification.VerificationSucceeded;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.svvrl.goal.core.util.PowerSet;
+
+import javax.swing.plaf.nimbus.State;
 
 
 /**
@@ -1272,44 +1278,274 @@ public class FvmFacade {
      * Büchi Automaton (NBA).
      *
      * @param <L> Type of resultant automaton transition alphabet
-     * @param ltl The LTL formula represented as a parse-tree.
+     * @param //ltl The LTL formula represented as a parse-tree.
      * @return An automaton A such that L_\omega(A)=Words(ltl)
      */
+    public <L> Set<Set<LTL<L>>> get_power(Set<LTL<L>> subs){
+        Set<Set<LTL<L>>> ret=new HashSet<>();
+        //Todo
+        return ret;
+    }
+
+    public <L> Set<Set<LTL<L>>> get_power_Set(Set<LTL<L>> given_set){
+        Set<Set<LTL<L>>> retSet = new HashSet<>();
+        if (given_set.isEmpty())
+            retSet.add(given_set);
+        else {
+            for (LTL<L> element : given_set){
+                given_set.remove(element);
+                Set<Set<LTL<L>>> without = new HashSet<>(get_power_Set(given_set));
+                for (Set<LTL<L>> notWith:without)
+                    retSet.add(notWith);
+                Set<Set<LTL<L>>> with = new HashSet<>();
+                for (Set<LTL<L>> obj : without)
+                    with.add(obj);
+                for (Set<LTL<L>> inWith : with) {
+                    Set<LTL<L>> toAdd = new HashSet<>(((Set) inWith));
+                    toAdd.add(element);
+                    retSet.add(toAdd);
+                }
+                break;
+            }
+        }
+        return retSet;
+    }
+
+    public <L> boolean is_valid_B(Set<LTL<L>> b,Set<LTL<L>> clousre){
+        Set<LTL<L>> notin_B=new HashSet<>();
+        //if(!b.contains(LTL.true_())) return false;
+        for (LTL<L> lltl:clousre){
+            if(!b.contains(lltl)){
+                notin_B.add(lltl);
+                if(!b.contains(get_Not(lltl))) return false;
+                //if(!(b.contains(get_Not(lltl)))) return false;
+            }
+            if(b.contains(lltl)&&b.contains(get_Not(lltl))) return false;
+            if(lltl instanceof Until) {
+                LTL<L> righti = ((Until<L>) lltl).getRight();
+                if(b.contains(righti)) if(!b.contains(lltl)) return false;
+                LTL<L> lefti=((Until<L>) lltl).getLeft();
+                if((!((b.contains(lefti))||(b.contains(righti))))&&(b.contains(lltl))) return false;
+            }
+            if(lltl instanceof And)
+            {
+                if(b.contains(lltl)){
+                    if((!b.contains(((And<L>) lltl).getRight()))||(!b.contains(((And<L>) lltl).getLeft()))) return false;
+                }
+                else {
+                    if(b.contains(((And<L>) lltl).getLeft())&&b.contains(((And<L>) lltl).getRight())) return false;
+                }
+            }
+        }
+        return true;
+    }
+    public <L> boolean is_transtion(Set<LTL<L>> from_B,Set<LTL<L>> too_B_tag,Set<LTL<L>> A,Set<LTL<L>> subs){
+        for(LTL<L> ltl_next:from_B){
+            if(ltl_next instanceof Next) if(!too_B_tag.contains(((Next<L>) ltl_next).getInner())) return false;
+            if(ltl_next instanceof AP) if(!A.contains(ltl_next)) return false;
+        }
+        for(LTL<L> a:A){ if(!from_B.contains(a)) return false; }
+
+        for(LTL<L> ltl_too:too_B_tag){
+             if(!from_B.contains(new Next<>(ltl_too))) return false; }
+        for (LTL<L> ltl_from_sub:subs){
+            if (ltl_from_sub instanceof Until){
+                LTL<L> left2=((Until<L>) ltl_from_sub).getLeft();
+                LTL<L> right1=((Until<L>) ltl_from_sub).getRight();
+                if (from_B.contains(ltl_from_sub)&&(!(from_B.contains(left2)))) {
+                    if(!(too_B_tag.contains(ltl_from_sub))) return false;
+                }
+                if ((!(from_B.contains(ltl_from_sub)))&&(from_B.contains(right1))) {
+                    if(too_B_tag.contains(ltl_from_sub)) return false;
+                }
+            }
+        }
+        return true;
+    }
+    public <L>  Set<Pair<Set<Set<LTL<L>>>,Integer>> get_final_states(Set<LTL<L>> subs,Set<Set<LTL<L>>> B_members){
+        Set<LTL<L>>until_sub=new HashSet<>();
+        for(LTL<L> ltl:subs) if(subs instanceof Until) until_sub.add(ltl);
+        Set<Pair<Set<Set<LTL<L>>>,Integer>> ret=new HashSet<>();
+        int counter=1;
+        for(Set<LTL<L>> mightB:B_members){
+            Set<Set<LTL<L>>> temp=new HashSet<>();
+            boolean is_good=true;
+            for (LTL<L> until:until_sub){
+                LTL<L> left2=((Until<L>) until).getLeft();
+                if((!(B_members.contains(until_sub)))||(B_members.contains(left2))) is_good=false;
+            }
+
+            if (is_good){
+                Set<Set<LTL<L>>>temp_set=new HashSet<>();
+                temp_set.add(mightB);
+                Pair<Set<Set<LTL<L>>>,Integer> to_add=new Pair<>(temp_set,new Integer(counter));
+                counter++;
+                ret.add(to_add);
+            }
+        }
+        return ret;
+    }
+    public <L> Set<L> get_real_A(Set<LTL<L>> A_of_b){
+        Set<L> ret=new HashSet<>();
+        for (LTL<L> ltl:A_of_b) {if(ltl instanceof AP) ret.add(((AP<L>) ltl).getName());}
+        return ret;
+    }
+    public <L> Set<LTL<L>> get_aa(Set<LTL<L>> b){
+        Set<LTL<L>> ret=new HashSet<>();
+        for (LTL<L> l:b) if(l instanceof AP) ret.add((AP<L>) l);
+        return ret;
+    }
+    public <L> LTL<L>  get_Not(LTL<L> ltl){
+        LTL<L> ret;
+        if(ltl instanceof Not){ ret=((Not<L>) ltl).getInner(); }
+        else{ ret=new Not<>(ltl); }
+        return ret;
+    }
+    public <L> Set<LTL<L>> get_clousre(LTL<L> ltl) {
+        Set<LTL<L>> ret=new HashSet<>();
+        ret.add(ltl); //adding the ltl itself
+        if(ltl instanceof TRUE){ret.add(get_Not(ltl)); }
+        else{
+            if(ltl instanceof Not){ ret.add(((Not<L>) ltl).getInner()); }
+            else{
+                if(ltl instanceof Next){
+                    ret.add(get_Not(ltl));
+                    ret.addAll(get_clousre(((Next<L>) ltl).getInner()));
+                }
+                else{
+                    if(ltl instanceof And){
+                        ret.add(get_Not(ltl));
+                        ret.addAll(get_clousre(((And<L>) ltl).getRight()));
+                        ret.addAll(get_clousre(((And<L>) ltl).getLeft()));
+                    }
+                    else{
+                        if(ltl instanceof Until){
+                            ret.add(get_Not(ltl));
+                            ret.addAll(get_clousre(((Until<L>) ltl).getRight()));
+                            ret.addAll(get_clousre(((Until<L>) ltl).getLeft()));
+                        }
+                    }
+                }
+            }
+        }
+        return ret;
+    }
     public <L> Automaton<?, L> LTL2NBA(LTL<L> ltl) {
-        throw new java.lang.UnsupportedOperationException();
+        Automaton<?, L> ret=new Automaton<>();
+        MultiColorAutomaton<Set<LTL<L>>,L> gnba=new MultiColorAutomaton<>();
+        Set<LTL<L>> subs_ltl=get_clousre(ltl);
+        Set<Set<LTL<L>>> power_members=get_power_Set(get_clousre(ltl));
+        Set<Set<LTL<L>>> B_members=new HashSet<>();
+        for(Set<LTL<L>> b:power_members) if(is_valid_B(b,subs_ltl)) B_members.add(b);
+        Set<Set<LTL<L>>> inital_states=new HashSet<>();
+        for(Set<LTL<L>> b:B_members){
+            if(b.contains(ltl)){
+                inital_states.add(b);
+                gnba.setInitial(b);
+            }
+            Set<LTL<L>> A_of_b=get_aa(b);
+            Set<L> real_A=get_real_A(A_of_b);
+            Set<Set<LTL<L>>> tempb=new HashSet<>(B_members);
+            tempb.remove(b);
+            for (Set<LTL<L>> b_tag:tempb){
+                if(is_transtion(b,b_tag,A_of_b,subs_ltl)){
+                    gnba.addTransition(b,real_A,b_tag);
+                }
+            }
+        }
+        Set<Pair<Set<Set<LTL<L>>>,Integer>> final_states=get_final_states(subs_ltl,B_members);
+        for (Pair<Set<Set<LTL<L>>>,Integer> funal_st:final_states) {
+            for (Set<LTL<L>> funal_state:funal_st.first) {
+
+                gnba.setAccepting(funal_state,funal_st.second.intValue());
+            }
+        }
+        ret=GNBA2NBA(gnba);
+        return ret;
     }
 
     /**
      * A translation of a Generalized Büchi Automaton (GNBA) to a
      * Nondeterministic Büchi Automaton (NBA).
      *
-     * @param <L>    Type of resultant automaton transition alphabet
-     * @param mulAut An automaton with a set of accepting states (colors).
+     * @param //<L>    Type of resultant automaton transition alphabet
+     * @param //mulAut An automaton with a set of accepting states (colors).
      * @return An equivalent automaton with a single set of accepting states.
      */
-    public <L> Automaton<?, L> GNBA2NBA(MultiColorAutomaton<?, L> mulAut) {
-        Automaton<Object, L> NBA = new Automaton<>();
-        int k = mulAut.getColors().size();
+    public Integer get_min_from_set(Set<Integer> set_int){
+        Integer ret=-1;
+        for (Integer x:set_int){ if(ret<x) ret=x; }
+        return ret;
+    }
+    public <State, L> boolean isaccepting(MultiColorAutomaton<State, L> mulAut,State state){
+        boolean ret=false;
         Set<Integer> colors = mulAut.getColors();
-        for (Object GTranKey : mulAut.getTransitions().keySet()){
-            for (Integer color : colors) {
-                Map<Set<L>, ? extends Set<?>> ActionDest = mulAut.getTransitions().get(GTranKey);
-                for (Set<L> action : ActionDest.keySet()) {
-                    for (Object Dest : ActionDest.get(action))
-                        if (mulAut.getAcceptingStates(color).contains(GTranKey)) { //later
-                            NBA.addTransition(GTranKey, action, Dest);
+        for (Integer layer:colors) if(mulAut.getAcceptingStates(layer).contains(state)) return true;
+        return ret;
+    }
+    public <State, L> Set<Object> run_over_layer(Set<Object> init,Integer layer_num,MultiColorAutomaton<State, L> mulAut,Automaton<Object, L> ret_NBA,int first_level_num,int next_level_num,boolean is_final_level){
+        Set<Pair<Object,Integer>> ran_over=new HashSet<>();
+        Set<Object> ret=new HashSet<>();
+        Queue<State> queue=new ArrayDeque<>();
+        for (State initial_state:(Set<State>)init){ queue.add(initial_state); }
+        Map<State, Map<Set<L>, Set<State>>> transitions=mulAut.getTransitions();
+        while (!queue.isEmpty()) {
+            State curr_state=queue.poll();
+            if(!ran_over.contains(curr_state)) {
+                Map<Set<L>, Set<State>> trans_of_state = transitions.get(curr_state);
+                Set<Set<L>> keyes_of_state = trans_of_state.keySet();
+                for (Set<L> tran : keyes_of_state) {
+                    Set<State> states_of_tran = transitions.get(curr_state).get(tran);
+                    for (State s : states_of_tran) {
+                        Pair<Object,Integer> ps=new Pair<>(curr_state,layer_num);
+                        Pair<Object,Integer> pd;
+                        if (mulAut.getAcceptingStates(layer_num).contains(s)) {
+                            int new_layer_num=0;
+                            if(is_final_level) new_layer_num=first_level_num;
+                            else new_layer_num=next_level_num;
+                        pd=new Pair<>(s,new_layer_num);
                         }
+                        else pd=new Pair<>(s,layer_num);
+                        ret_NBA.addTransition(ps,tran,pd);
+                        ran_over.add(pd);
+                        //queue.add(s);
+                        ret.add(s);
+                    }
                 }
-
             }
         }
-        return null;
+        return  ret;
+    }
+    public Integer get_real_num(int num,int k){
+        return new Integer((num%k)+1);
+    }
+
+    public <L> Automaton<?, L> GNBA2NBA(MultiColorAutomaton<?, L> mulAut) {
+        Automaton<Object, L> ret_NBA = new Automaton<>();
+        int k = mulAut.getColors().size();
+        Set<Integer> colors = mulAut.getColors();
+        List<Integer> color_list=new LinkedList<>(colors);
+        Collections.sort(color_list);
+        int index=0;
+        Integer inital_level_index=color_list.get(index);
+        for (Object initial_state:mulAut.getInitialStates()){ ret_NBA.setInitial(new Pair<Object,Integer>(initial_state,get_real_num(index,k))); }
+        for (Object final_state:mulAut.getAcceptingStates(inital_level_index)) {ret_NBA.setAccepting(new Pair<Object,Integer>(final_state,get_real_num(index,k)));}
+        Set<Object> states= (Set<Object>) mulAut.getInitialStates();
+        while (index<color_list.size()-1){
+           states=run_over_layer(states,new Integer(index),mulAut,ret_NBA,inital_level_index,color_list.get(index),false);
+           index++;
+        }
+        states=run_over_layer(states,new Integer(index),mulAut,ret_NBA,inital_level_index,inital_level_index,true);
+        //run_over_layer(,new Integer(index),mulAut,ret_NBA,inital_level_index,color_list.get(inital_level_index),false);
+        return ret_NBA;
 //        throw new java.lang.UnsupportedOperationException();
     }
 
     public static void main(String[] args) {
-        String s = "ab;cd";
-        System.out.println(s.substring(s.indexOf(";")+1));
+        Set<Integer> check = new HashSet<>();
+        check.add(1);
+        check.add(2);
+        System.out.println();
     }
 
 }

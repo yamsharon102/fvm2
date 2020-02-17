@@ -19,6 +19,7 @@ public class MultiColorAutomaton<State, L> {
     }
 
     public void addState(State s) {
+
         if (!transitions.containsKey(s)) {
             transitions.put(s, new HashMap<>());
         }
